@@ -1,8 +1,7 @@
 #include <iostream>
-using namespace std;
-
 #include <cstdint>
 
+using namespace std;
 
 class Bus{
 	uint8_t memory[65536];
@@ -45,6 +44,7 @@ enum flag{
 };
 
 class MOS_6502 {
+public:
 	// CPU registers
 	uint8_t  a  = 0;    // Accumulator
 	uint8_t  x  = 0;    // Index X
@@ -80,8 +80,6 @@ class MOS_6502 {
 		}
 	}
 
-	void instructions(opcode){
-
 		/* 
 		** Load or Store Operations 
 		*/
@@ -109,7 +107,7 @@ class MOS_6502 {
 		}
 
 		// Load Y Register
-		void ldy(){
+		void ldy(uint16_t address){
 			y = bus.getValue(address);
 
 			bool z = y == 0;
@@ -184,12 +182,18 @@ class MOS_6502 {
 
 		// Transfer Stack Pointer to X
 		void tsx(){
+			x = s;
 
+			bool z = x == 0;
+			handleFlag(Zero, x);
+
+			bool n = x & (1 << 7);
+			handleFlag(Negative, n);
 		}
 
 		// Transfer X to Stack Pointer
 		void txs(){
-
+			s = x;
 		}
 
 		// Push Accumulator
@@ -242,7 +246,7 @@ class MOS_6502 {
 			a = a ^ value;
 
 			bool n = (a & (1 << 7)) != 0;
-			bool(Negative, n);
+			handleFlag(Negative, n);
 			
 			bool z = a == 0;
 			handleFlag(Zero, z);
@@ -285,7 +289,7 @@ class MOS_6502 {
 			bool a7 = (a & (1 << 7)) != 0;
 			bool m7 = (value & (1 << 7)) != 0;
 
-			bool carryIn = getValue(Carry) ? 1 : 0;
+			bool carryIn = getFlag(Carry);
 
 			a = a + value + carryIn;
 			bool carryOut = a < value;
@@ -297,12 +301,15 @@ class MOS_6502 {
 			handleFlag(Negative, n);
 
 			bool signResult = (a & (1 << 7)) != 0;
-			bool v = (a7 == m7) && (a7 != signedResult);
+			bool v = (a7 == m7) && (a7 != signResult);
 			handleFlag(Overflow, v);
 		}
 
 		// Subtract with Carry
-		void sbc(){
+		void sbc(uint16_t address){
+			uint8_t m = bus.getValue(address);
+			bool c = getFlag(Carry);
+			a = a - m - (1 - c);
 
 		}
 
@@ -312,10 +319,10 @@ class MOS_6502 {
 
 			uint8_t cmpValue = a - value;
 
-			bool c = a >= m;
+			bool c = a >= value;
 			handleFlag(Carry, c);
 
-			bool z = a == m;
+			bool z = a == value;
 			handleFlag(Zero, z);
 
 			bool n = (cmpValue & (1 << 7)) != 0;
@@ -451,8 +458,30 @@ class MOS_6502 {
 
 		// Logical Shift Right
 		void lsr(){
-			// TODO
-			a = a / 2;
+			uint8_t tempValue;
+
+			if(1){ // TODO
+				tempValue = a;
+			}else{
+				// tempValue = m;
+			}
+			
+			bool c = tempValue & 1;
+			handleFlag(Carry, c);
+			
+			tempValue = tempValue >> 1;
+
+			bool z = tempValue == 0;
+			handleFlag(Zero, z);
+
+			bool v = tempValue & (1 << 7);
+			handleFlag(Overflow, v);
+
+			if(1){ // TODO
+				a = tempValue;
+			}else{
+				// m = tempValue;
+			}
 		}
 
 		// Rotate Left
@@ -461,13 +490,13 @@ class MOS_6502 {
 			
 			// TODO
 			a << 1;
-			m << 1;
+			// m << 1;
 
 			bool carryFlag = getFlag(Carry);
 			
 			// TODO
 			a = a | carryFlag;
-			m = m | carryFlag;
+			// m = m | carryFlag;
 
 			handleFlag(Carry, bitSeven);
 		}
@@ -478,13 +507,13 @@ class MOS_6502 {
 			
 			// TODO
 			a >> 1;
-			m >> 1;
+			// m >> 1;
 
 			bool carryFlag = getFlag(Carry);
 			
 			// TODO
 			a = a | (carryFlag << 7);
-			m = m | (carryFlag << 7);
+			// m = m | (carryFlag << 7);
 
 			handleFlag(Carry, bitZero);
 		}
@@ -499,15 +528,16 @@ class MOS_6502 {
 		}
 
 		// Jump to Subroutine
-		void jsr(uintt16_t address){
-			bus.setValue(s, pc + 2);
+		void jsr(uint16_t address){
+			uint16_t tempAddress = s | 0x100;
+			bus.setValue(tempAddress, pc - 1);
 			s--;
 			pc = address;
 		}
 
 		// Return from Subroutine
 		void rts(){
-
+			pc = bus.getValue(s | 0x100);
 		}
 
 		/*
@@ -516,7 +546,7 @@ class MOS_6502 {
 
 		// Branch if Carry Clear
 		void bcc(uint16_t displacement){ // TODO
-			Bool carryFlag = getFlag(Carry);
+			bool carryFlag = getFlag(Carry);
 			
 			if(!carryFlag){
 				pc += displacement;
@@ -525,7 +555,7 @@ class MOS_6502 {
 
 		// Branch if Carry Set
 		void bcs(uint16_t displacement){ // TODO
-			Bool carryFlag = getFlag(Carry);
+			bool carryFlag = getFlag(Carry);
 			
 			if(carryFlag){
 				pc += displacement;	
@@ -534,7 +564,7 @@ class MOS_6502 {
 
 		// Branch if Equal
 		void beq(uint16_t displacement){ // TODO
-			Bool zeroFlag = getFlag(Zero);
+			bool zeroFlag = getFlag(Zero);
 			
 			if(zeroFlag){
 				pc += displacement;
@@ -544,7 +574,7 @@ class MOS_6502 {
 
 		// Branch if Minus
 		void bmi(uint16_t displacement){
-			Bool negativeFlag = getFlag(Negative);
+			bool negativeFlag = getFlag(Negative);
 			
 			if(negativeFlag){
 				pc += displacement;
@@ -553,7 +583,7 @@ class MOS_6502 {
 
 		// Branch if Not Equal
 		void bne(uint16_t displacement){
-			Bool zeroFlag = getFlag(Zero);
+			bool zeroFlag = getFlag(Zero);
 			
 			if(!zeroFlag){
 				pc += displacement;
@@ -562,21 +592,16 @@ class MOS_6502 {
 
 		// Branch if Positive
 		void bpl(uint16_t displacement){
-			Bool negativeFlag = getFlag(Negative);
+			bool negativeFlag = getFlag(Negative);
 			
 			if(!negativeFlag){
 				pc += displacement;
 			}
 		}
 
-		// BRK - Force Interrupt
-		if(opcode == 0x00){
-			handleFlag(Break, true);
-		}
-
 		// Branch if Overflow Clear
 		void bvc(uint16_t displacement){
-			Bool overflowFlag = getFlag(Overflow);
+			bool overflowFlag = getFlag(Overflow);
 			
 			if(!overflowFlag){
 				pc += displacement;
@@ -585,7 +610,7 @@ class MOS_6502 {
 
 		// Branch if Overflow Set
 		void bvs(uint16_t displacement){
-			Bool overflowFlag = getFlag(Overflow);
+			bool overflowFlag = getFlag(Overflow);
 			
 			if(overflowFlag){
 				pc += displacement;
@@ -635,6 +660,20 @@ class MOS_6502 {
 		** System Functions
 		*/
 
+		// Force an Interrupt
+		void brk(){
+			bus.setValue(s | 0x100, pc);
+			s--;
+			bus.setValue(s | 0x100, p);
+			s--;
+
+			uint16_t tempValue = bus.getValue(0xFFFE);
+			tempValue << 8;
+			tempValue = tempValue | bus.getValue(0xFFFF);
+
+			handleFlag(Break, true);
+		}
+
 		// No Operation
 		void nop(){
 
@@ -642,13 +681,51 @@ class MOS_6502 {
 		
 		// Return from Interrupt
 		void rti(){
-
+			p = bus.getValue((s + 1) | 0x100);
+			s++;
+			pc = bus.getValue((s + 1) | 0x100);
+			s++;
 		}
+
+	void executeTest(uint8_t opcode){
+		if(opcode == 0x78){
+			sei();
+		}
+		if(opcode == 0x58){
+			cld();
+		}
+		pc++;
 	}
 };
 
 MOS_6502 cpu;
 
+#include<fstream>
+#include<sstream>
+#include<string>
+
 int main() {
+	ifstream myfile("donkey kong.nes");
+	char c;
+	for(int i = 0; i < 16; i++){
+		myfile.get(c);
+		cout << (int)c << endl;
+	}
+
+	for(int i = 0; i < 16384; i++){
+		myfile.get(c);
+		bus.setValue(0x8000 + i, c);
+		bus.setValue(0xC000 + i, c);
+	}
+
+	myfile.close();
+
+	uint16_t test = bus.getValue(0xFFFD) << 8;
+	test |= bus.getValue(0xFFFC);
+	
+	cout << hex << test << endl;
+
+	cpu.pc = test;
+
 	return 0;
 }
