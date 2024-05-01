@@ -1,21 +1,70 @@
-#ifndef UNICODE
-#define UNICODE
-#endif
+#include "window.h"
 
-#include <windows.h>
-#include <iostream>
-#include <stdlib.h>
-
-using namespace std;
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-void getidle();
-
-HWND wind = NULL;
-int test = 0;
-
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR pCmdLine, int nCmdShow)
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	switch (uMsg)
+	{
+		case WM_PAINT:
+		{
+			PAINTSTRUCT ps;
+			HDC hdc = BeginPaint(hwnd, &ps);
+			HDC hdcMem = CreateCompatibleDC(hdc);
+
+			int w = 256;
+			int h = 240;
+
+			int32_t* pvBits = NULL;
+
+			BITMAPINFO bmi;
+			memset(&bmi, 0, sizeof(BITMAPINFO));
+			bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biWidth = 256;
+			bmi.bmiHeader.biHeight = 240;
+			bmi.bmiHeader.biPlanes = 1;
+			bmi.bmiHeader.biBitCount = 32;
+			bmi.bmiHeader.biCompression = BI_RGB;
+			
+			HBITMAP bitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, (void**)&pvBits, 0, 0);
+			HGDIOBJ oldbmp = SelectObject(hdcMem, bitmap); 
+
+			BitBlt(hdcMem, 0, 0, w, h, hdc, 0, 0, SRCCOPY);
+			
+			for(int i = 0; i < w *h; i++){
+				pvBits[i] = windowPixelColor[i];
+			}
+			cout << hex << pvBits[0] << endl;
+			BitBlt(hdc, 0, 0, w, h, hdcMem, 0, 0, SRCCOPY);
+
+			SelectObject(hdcMem, oldbmp);
+			DeleteObject(bitmap);
+			DeleteDC(hdcMem);
+
+			EndPaint(hwnd, &ps);
+
+			return 0;
+		}
+		case WM_DESTROY:
+			PostQuitMessage(0);
+			return 0;
+	}
+
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+int CALLBACK getidle(){
+	for(int i = 0; i < windowWidth * windowHeight; i++){
+		windowPixelColor[i] = tempColor;
+	}
+	
+	tempColor += 0x01010100;
+	InvalidateRect(wind, NULL, 0);
+
+	return 0;
+}
+
+DWORD WINAPI ep(void* data){
+	HINSTANCE hInstance = GetModuleHandle(NULL);
+
 	const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
 	WNDCLASS wc = { };
@@ -48,73 +97,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR pCmdLine, int nCmdShow)
 		return 0;
 	}
 	
-	ShowWindow(wind, nCmdShow);
+	ShowWindow(wind, 1);
 
-	
-    SetTimer(wind, 1, 200, (TIMERPROC) getidle);
-	
-	// Run the message loop.
 	MSG msg = { };
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
+	
 
 	return 0;
 }
 
-void getidle(){
-	InvalidateRect(wind, 0, TRUE);
-}
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	switch (uMsg)
-	{
-		case WM_PAINT:
-		{
-			PAINTSTRUCT ps;
-			HDC hdc = BeginPaint(hwnd, &ps);
-			HDC hdcMem = CreateCompatibleDC(hdc);
-
-			int w = 256;
-			int h = 240;
-
-			int32_t* pvBits = NULL;
-
-			BITMAPINFO bmi;
-			memset(&bmi, 0, sizeof(BITMAPINFO));
-			bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-			bmi.bmiHeader.biWidth = 256;
-			bmi.bmiHeader.biHeight = 240;
-			bmi.bmiHeader.biPlanes = 1;
-			bmi.bmiHeader.biBitCount = 32;
-			bmi.bmiHeader.biCompression = BI_RGB;
-			
-			HBITMAP bitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, (void**)&pvBits, 0, 0);
-			HGDIOBJ oldbmp = SelectObject(hdcMem, bitmap); 
-
-			BitBlt(hdcMem, 0, 0, w, h, hdc, 0, 0, SRCCOPY);
-			
-			for(int i = 0; i < w*h; i++){
-				pvBits[i] = 0x00000000;
-			}
-
-			BitBlt(hdc, 0, 0, w, h, hdcMem, 0, 0, SRCCOPY);
-
-			SelectObject(hdcMem, oldbmp);
-			DeleteObject(bitmap);
-			DeleteDC(hdcMem);
-
-			EndPaint(hwnd, &ps);
-
-			return 0;
-		}
-		case WM_DESTROY:
-			PostQuitMessage(0);
-			return 0;
-	}
-
-	return DefWindowProc(hwnd, uMsg, wParam, lParam);
-}
