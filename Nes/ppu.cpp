@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>  
 
-#include "window.h"
-
 using namespace std;
 
 class PPU{
@@ -18,6 +16,8 @@ class PPU{
 	uint8_t ppuaddr;
 	uint8_t ppudata;
 	uint8_t oamdma;
+	uint8_t OAM [256];
+	bool NMI_occurrred;
 public:
 	void setupColor(){
 		color[0] = 0x55555500;
@@ -85,8 +85,27 @@ public:
 		color[62] = 0x00000000;
 		color[63] = 0x00000000;
 	}
+
+	void reset(){
+		ppuctrl = 0;
+		ppumask = 0;
+		ppustatus;
+		oamaddr;
+		ppuscroll = 0;
+		ppuaddr;
+		ppudata = 0;
+	}
+
+	void nmi(){
+		NMI_occurrred = true;
+
+		NMI_occurrred = false;
+		bool NMI_output = false; 
+	}
 };
 
+
+/*
 PPU ppu_2C02;
 
 int main() {
@@ -99,3 +118,4 @@ int main() {
 
 	return 0;
 }
+*/

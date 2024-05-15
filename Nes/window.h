@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <cstdint>
 
-using namespace std;
-
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 inline uint32_t tempColor = 0;
