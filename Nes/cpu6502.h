@@ -108,19 +108,19 @@ public:
 	*/
 
 	// ADC - Add with Carry
-	void adc(uint16_t address);
+	void adc(uint8_t value);
 
 	// Subtract with Carry
-	void sbc(uint16_t address);
+	void sbc(uint8_t value);
 
 	// Compare
-	void cmp(uint16_t address);
+	void cmp(uint8_t value);
 
 	// Compare X Register
-	void cpx(uint16_t address);
+	void cpx(uint8_t value);
 
 	// Compare Y Register
-	void cpy(uint16_t address);
+	void cpy(uint8_t value);
 
 	/*
 	** Increment and Decrements
@@ -149,16 +149,16 @@ public:
 	*/
 
 	// Arithmetic Shift Left
-	void asl(uint16_t address);
+	void asl(uint16_t address, bool isAccumulatorMode);
 
 	// Logical Shift Right
-	void lsr();
+	void lsr(uint16_t address, bool isAccumulatorMode);
 
 	// Rotate Left
-	void rol();
+	void rol(uint16_t address, bool isAccumulatorMode);
 
 	// Rotate Right
-	void ror();
+	void ror(uint16_t address, bool isAccumulatorMode);
 
 	/*
 	** Jumps and Calls
@@ -244,7 +244,7 @@ public:
 
 	void nmi();
 
-	uint16_t handleMode(int, uint16_t);
+	uint16_t getModeInstruction(int);
 
 	void executeTest(uint8_t opcode);
 };
