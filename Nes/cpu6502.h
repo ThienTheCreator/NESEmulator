@@ -13,9 +13,16 @@ public:
 	uint8_t  x  = 0;    // Index X
 	uint8_t  y  = 0;    // Index Y
 	uint16_t pc = 0;    // Program Counter
-	uint8_t  s  = 0xFF; // Stack Pointeri
+	uint8_t  s  = 0xFF; // Stack Pointer
 	
-	uint8_t p = 0b01100000; // status register
+	uint8_t p = 0; // status register
+
+	CPU6502(){
+		pc = 0xFFFC;
+		s = 0xFD;
+
+		p = 0x24;
+	}
 
 	void connectBus(Bus* b){ bus = b; }
 
@@ -27,15 +34,22 @@ public:
 
 	bool getFlag(uint8_t bit);
 
+
+	void irq();
+
+	void nmi();
+
+	void reset();
+
 	/* 
 	** Load or Store Operations 
 	*/
 
 	// Load Accumulator
-	void lda(uint16_t address);
+	void lda(uint8_t address);
 
 	// Load X Register
-	void ldx(uint16_t address);
+	void ldx(uint8_t address);
 
 	// Load Y Register
 	void ldy(uint16_t address);
@@ -92,16 +106,16 @@ public:
 	*/
 
 	// Logical and
-	void andL(uint16_t address);
+	void andL(uint8_t value);
 	
 	// Exclusive OR
-	void eor(uint16_t address);
+	void eor(uint8_t value);
 
 	// Logical Inclusive OR
-	void ora(uint16_t address);
+	void ora(uint8_t value);
 
 	// bit test
-	void bit(uint16_t address);
+	void bit(uint8_t value);
 
 	/*
 	** Arithmetic
@@ -178,29 +192,29 @@ public:
 	*/
 
 	// Branch if Carry Clear
-	void bcc(uint16_t displacement);
+	void bcc(int8_t displacement);
 
 	// Branch if Carry Set
-	void bcs(uint16_t displacement);
+	void bcs(int8_t displacement);
 
 	// Branch if Equal
-	void beq(uint16_t displacement);
+	void beq(int8_t displacement);
 
 
 	// Branch if Minus
-	void bmi(uint16_t displacement);
+	void bmi(int8_t displacement);
 
 	// Branch if Not Equal
-	void bne(uint16_t displacement);
+	void bne(int8_t displacement);
 
 	// Branch if Positive
-	void bpl(uint16_t displacement);
+	void bpl(int8_t displacement);
 
 	// Branch if Overflow Clear
-	void bvc(uint16_t displacement);
+	void bvc(int8_t displacement);
 
 	// Branch if Overflow Set
-	void bvs(uint16_t displacement);
+	void bvs(int8_t displacement);
 
 	/*
 	** Status Flag Changes
@@ -240,11 +254,7 @@ public:
 	// Return from Interrupt
 	void rti();
 
-	void irq();
-
-	void nmi();
-
 	uint16_t getModeInstruction(int);
 
-	void executeTest(uint8_t opcode);
+	void executeInstruction(uint8_t opcode);
 };

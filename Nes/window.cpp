@@ -36,7 +36,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			for(int i = 0; i < w *h; i++){
 			pvBits[i] = windowPixelColor[i];
 			}
-			cout << hex << pvBits[0] << endl;
 			BitBlt(hdc, 0, 0, w, h, hdcMem, 0, 0, SRCCOPY);
 
 			SelectObject(hdcMem, oldbmp);

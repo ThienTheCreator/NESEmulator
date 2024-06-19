@@ -17,8 +17,18 @@ class PPU{
 	uint8_t ppudata;
 	uint8_t oamdma;
 	uint8_t OAM [256];
+	
+	uint16_t v;
+	uint16_t t;
+	uint8_t x;
+	bool w;
+	
 	bool NMI_occurrred;
 public:
+	PPU(){
+		setupColor();
+	}
+
 	void setupColor(){
 		color[0] = 0x55555500;
 		color[1] = 0x00177300;
@@ -96,11 +106,20 @@ public:
 		ppudata = 0;
 	}
 
-	void nmi(){
-		NMI_occurrred = true;
+	void setVblankFlag(){
+		ppustatus |= 0b10000000;
+	}
 
-		NMI_occurrred = false;
-		bool NMI_output = false; 
+	void unsetVblankFlag(){
+		ppustatus &= 0b01111111;
+	}
+	
+	void setNmiFlag(){
+		ppuctrl |= 0b10000000;
+	}
+
+	void unsetNmiFlag(){
+		ppuctrl &= 0b01111111;
 	}
 };
 

@@ -67,7 +67,7 @@ bool CPU6502::getFlag(uint8_t bit){
 */
 
 // Load Accumulator
-void CPU6502::lda(uint16_t value){
+void CPU6502::lda(uint8_t value){
 	a = value;
 	
 	bool z = a == 0;
@@ -78,7 +78,7 @@ void CPU6502::lda(uint16_t value){
 }
 
 // Load X Register
-void CPU6502::ldx(uint16_t value){
+void CPU6502::ldx(uint8_t value){
 	x = value;
 
 	bool z = x == 0;
@@ -153,9 +153,13 @@ void CPU6502::txa(){
 
 // Transfer Y to Accumulator
 void CPU6502::tya(){
-	handleFlag(Zero, a == 0);
-	bool expression = (a & (1 << 7)) == 0; 
-	handleFlag(Negative, expression);
+	a = y;
+
+	bool z = a == 0;
+	handleFlag(Zero, z);
+	
+	bool n = (a & (1 << 7)) != 0; 
+	handleFlag(Negative, n);
 }
 
 /*
@@ -167,7 +171,7 @@ void CPU6502::tsx(){
 	x = s;
 
 	bool z = x == 0;
-	handleFlag(Zero, x);
+	handleFlag(Zero, z);
 
 	bool n = x & (1 << 7);
 	handleFlag(Negative, n);
@@ -180,20 +184,20 @@ void CPU6502::txs(){
 
 // Push Accumulator
 void CPU6502::pha(){
-	bus->setValue(s, a);
+	bus->setValue(s | 0x100, a);
 	s--;
 }
 
 // Push Processor Status
 void CPU6502::php(){
-	bus->setValue(s, p);
+	bus->setValue(s | 0x100, p | 0x10);
 	s--;
 }
 
 // Pull Accumulator
 void CPU6502::pla(){
-	a = bus->getValue(s + 1);
 	s++;
+	a = bus->getValue(s | 0x100);
 
 	bool z = a == 0;
 	handleFlag(Zero, z);
@@ -204,8 +208,8 @@ void CPU6502::pla(){
 
 // Pull Processor Status
 void CPU6502::plp(){
-	p = bus->getValue(s + 1);
 	s++;
+	p = bus->getValue(s | 0x100) & 0xEF | 0x20;
 }
 
 /*
@@ -213,16 +217,17 @@ void CPU6502::plp(){
 */
 
 // Logical and
-void CPU6502::andL(uint16_t value){
+void CPU6502::andL(uint8_t value){
 	a = a & value;
 
-	handleFlag(Zero, a == 0);
-	bool n = a & (1 << 7);
+	bool z = a == 0;
+	handleFlag(Zero, z);
+	bool n = (a & (1 << 7)) != 0;
 	handleFlag(Negative, n);
 }
 
 // Exclusive OR
-void CPU6502::eor(uint16_t value){
+void CPU6502::eor(uint8_t value){
 	a = a ^ value;
 
 	bool n = (a & (1 << 7)) != 0;
@@ -233,7 +238,7 @@ void CPU6502::eor(uint16_t value){
 }
 
 // Logical Inclusive OR
-void CPU6502::ora(uint16_t value){
+void CPU6502::ora(uint8_t value){
 	a = a | value;
 
 	bool c = a == 0;
@@ -244,7 +249,7 @@ void CPU6502::ora(uint16_t value){
 }
 
 // bit test
-void CPU6502::bit(uint16_t value){
+void CPU6502::bit(uint8_t value){
 	bool n = (value & (1 << 7)) != 0;
 	handleFlag(Negative, n);
 
@@ -547,20 +552,24 @@ void CPU6502::ror(uint16_t address, bool isAccumulatorMode){
 
 // Jump
 void CPU6502::jmp(uint16_t address){
-	pc = address;
+	pc = address - 1;
 }
 
 // Jump to Subroutine
 void CPU6502::jsr(uint16_t address){
-	uint16_t tempAddress = s | 0x100;
-	bus->setValue(tempAddress, pc - 1);
+	bus->setValue(s | 0x100, pc >> 8);
 	s--;
-	pc = address;
+	bus->setValue(s | 0x100, pc);
+	s--;
+	pc = address - 1;
 }
 
 // Return from Subroutine
 void CPU6502::rts(){
-	pc = bus->getValue(s | 0x100) - 1;
+	s++;
+	pc = bus->getValue(s | 0x100);
+	s++;
+	pc |= bus->getValue(s | 0x100) << 8;
 }
 
 /*
@@ -568,7 +577,7 @@ void CPU6502::rts(){
 */
 
 // Branch if Carry Clear
-void CPU6502::bcc(uint16_t displacement){ // TODO
+void CPU6502::bcc(int8_t displacement){ // TODO
 	bool carryFlag = getFlag(Carry);
 	
 	if(!carryFlag){
@@ -577,7 +586,7 @@ void CPU6502::bcc(uint16_t displacement){ // TODO
 }
 
 // Branch if Carry Set
-void CPU6502::bcs(uint16_t displacement){ // TODO
+void CPU6502::bcs(int8_t displacement){
 	bool carryFlag = getFlag(Carry);
 	
 	if(carryFlag){
@@ -586,7 +595,7 @@ void CPU6502::bcs(uint16_t displacement){ // TODO
 }
 
 // Branch if Equal
-void CPU6502::beq(uint16_t displacement){ // TODO
+void CPU6502::beq(int8_t displacement){ // TODO
 	bool zeroFlag = getFlag(Zero);
 	
 	if(zeroFlag){
@@ -596,7 +605,7 @@ void CPU6502::beq(uint16_t displacement){ // TODO
 
 
 // Branch if Minus
-void CPU6502::bmi(uint16_t displacement){
+void CPU6502::bmi(int8_t displacement){
 	bool negativeFlag = getFlag(Negative);
 	
 	if(negativeFlag){
@@ -605,7 +614,7 @@ void CPU6502::bmi(uint16_t displacement){
 }
 
 // Branch if Not Equal
-void CPU6502::bne(uint16_t displacement){
+void CPU6502::bne(int8_t displacement){
 	bool zeroFlag = getFlag(Zero);
 	
 	if(!zeroFlag){
@@ -614,7 +623,7 @@ void CPU6502::bne(uint16_t displacement){
 }
 
 // Branch if Positive
-void CPU6502::bpl(uint16_t displacement){
+void CPU6502::bpl(int8_t displacement){
 	bool negativeFlag = getFlag(Negative);
 	
 	if(!negativeFlag){
@@ -623,7 +632,7 @@ void CPU6502::bpl(uint16_t displacement){
 }
 
 // Branch if Overflow Clear
-void CPU6502::bvc(uint16_t displacement){
+void CPU6502::bvc(int8_t displacement){
 	bool overflowFlag = getFlag(Overflow);
 	
 	if(!overflowFlag){
@@ -632,7 +641,7 @@ void CPU6502::bvc(uint16_t displacement){
 }
 
 // Branch if Overflow Set
-void CPU6502::bvs(uint16_t displacement){
+void CPU6502::bvs(int8_t displacement){
 	bool overflowFlag = getFlag(Overflow);
 	
 	if(overflowFlag){
@@ -687,12 +696,15 @@ void CPU6502::sei(){
 void CPU6502::brk(){
 	bus->setValue(s | 0x100, pc);
 	s--;
+	bus->setValue(s | 0x100, pc >> 8);
+	s--;
 	bus->setValue(s | 0x100, p);
 	s--;
 
-	uint16_t tempValue = bus->getValue(0xFFFE);
-	tempValue << 8;
-	tempValue = tempValue | bus->getValue(0xFFFF);
+	uint16_t temp = bus->getValue(0xFFFE);
+	temp = temp | bus->getValue(0xFFFF) << 8;
+
+	pc = temp;
 
 	handleFlag(Break, true);
 }
@@ -704,20 +716,40 @@ void CPU6502::nop(){
 
 // Return from Interrupt
 void CPU6502::rti(){
-	p = bus->getValue((s + 1) | 0x100);
 	s++;
-	pc = bus->getValue((s + 1) | 0x100);
+	p = bus->getValue(s | 0x100);
 	s++;
+	pc = bus->getValue(s | 0x100);
+	s++;
+	pc |= bus->getValue(s | 0x100) << 8;
+	
+	pc--;
 }
 
 void CPU6502::irq(){
-	if(getFlag(Interrupt) == false){
-		brk();		
-	}
+	setFlag(Interrupt);
 }
 
 void CPU6502::nmi(){
+	bus->setValue(s | 0x100, pc);
+	s--;
+	bus->setValue(s | 0x100, pc >> 8);
+	s--;
+	
+	handleFlag(Break, 0);
+	handleFlag(Interrupt, 1);
+	
+	bus->setValue(s | 0x100, p);
+	s--;
 
+	uint16_t temp = bus->getValue(0xFFFA);
+	temp = temp | bus->getValue(0xFFFB) << 8;
+
+	pc = temp;
+}
+
+void CPU6502::reset(){
+	setFlag(Interrupt);
 }
 
 enum addressingMode{
@@ -735,7 +767,7 @@ enum addressingMode{
 };
 
 uint16_t CPU6502::getModeInstruction(int mode){
-	p++;
+	pc++;
 
 	if(mode == Immediate){ // Immediate
 		return bus->getValue(pc); 
@@ -753,6 +785,11 @@ uint16_t CPU6502::getModeInstruction(int mode){
 	if(mode == ZeroPageY){
 		uint8_t address = bus->getValue(pc);
 		return (uint8_t)(address + y);
+	}
+
+	if(mode == Relative){
+		uint8_t displacement = bus->getValue(pc);
+		return displacement;
 	}
 
 	if(mode == Absolute){ // Absolute
@@ -784,12 +821,10 @@ uint16_t CPU6502::getModeInstruction(int mode){
 		return bus->getValue(temp3);
 	}
 
-	return 0xFFFF;
+	return 0;
 }
 
-void CPU6502::executeTest(uint8_t opcode){
-	cout <<  "opcode: " << hex << (int)opcode << endl;
-
+void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0xA9){
 		uint16_t value = getModeInstruction(Immediate);
 		lda(value);
@@ -867,8 +902,7 @@ void CPU6502::executeTest(uint8_t opcode){
 	}
 
 	if(opcode == 0xA0){
-		uint16_t address = getModeInstruction(Immediate);
-		uint16_t value = bus->getValue(address);
+		uint16_t value = getModeInstruction(Immediate);
 		ldy(value);
 	}
 
@@ -1576,3 +1610,5 @@ void CPU6502::executeTest(uint8_t opcode){
 
 	pc++;
 }
+
+
