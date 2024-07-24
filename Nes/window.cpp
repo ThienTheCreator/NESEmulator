@@ -34,7 +34,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			BitBlt(hdcMem, 0, 0, w, h, hdc, 0, 0, SRCCOPY);
 			
 			for(int i = 0; i < w *h; i++){
-			pvBits[i] = windowPixelColor[i];
+				pvBits[i] = windowPixelColor[i];
 			}
 			BitBlt(hdc, 0, 0, w, h, hdcMem, 0, 0, SRCCOPY);
 

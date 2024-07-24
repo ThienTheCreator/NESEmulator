@@ -101,17 +101,17 @@ void CPU6502::ldy(uint16_t value){
 
 // Store Accumulator
 void CPU6502::sta(uint16_t address){
-	bus->setValue(address, a);
+	bus->cpuWrite(address, a);
 }
 
 // Store X Register
 void CPU6502::stx(uint16_t address){
-	bus->setValue(address, x);
+	bus->cpuWrite(address, x);
 }
 
 // Store Y Register
 void CPU6502::sty(uint16_t address){
-	bus->setValue(address, y);
+	bus->cpuWrite(address, y);
 }
 
 /*
@@ -184,20 +184,20 @@ void CPU6502::txs(){
 
 // Push Accumulator
 void CPU6502::pha(){
-	bus->setValue(s | 0x100, a);
+	bus->cpuWrite(s | 0x100, a);
 	s--;
 }
 
 // Push Processor Status
 void CPU6502::php(){
-	bus->setValue(s | 0x100, p | 0x10);
+	bus->cpuWrite(s | 0x100, p | 0x10);
 	s--;
 }
 
 // Pull Accumulator
 void CPU6502::pla(){
 	s++;
-	a = bus->getValue(s | 0x100);
+	a = bus->cpuRead(s | 0x100);
 
 	bool z = a == 0;
 	handleFlag(Zero, z);
@@ -209,7 +209,7 @@ void CPU6502::pla(){
 // Pull Processor Status
 void CPU6502::plp(){
 	s++;
-	p = bus->getValue(s | 0x100) & 0xEF | 0x20;
+	p = bus->cpuRead(s | 0x100) & 0xEF | 0x20;
 }
 
 /*
@@ -355,10 +355,10 @@ void CPU6502::cpy(uint8_t value){
 
 // Increment Memory
 void CPU6502::inc(uint16_t address){
-	uint8_t value = bus->getValue(address);
+	uint8_t value = bus->cpuRead(address);
 	value = value + 1;
 
-	bus->setValue(address, value);
+	bus->cpuWrite(address, value);
 
 	bool n = (value & (1 << 7)) != 0;
 	handleFlag(Negative, n);
@@ -392,10 +392,10 @@ void CPU6502::iny(){
 
 // Decrement Memory
 void CPU6502::dec(uint16_t address){
-	uint8_t value = bus->getValue(address);
+	uint8_t value = bus->cpuRead(address);
 	value = value - 1;
 
-	bus->setValue(address, value);
+	bus->cpuWrite(address, value);
 
 	bool n = (value & (1 << 7)) != 0;
 	handleFlag(Negative, n);
@@ -436,7 +436,7 @@ void CPU6502::asl(uint16_t address, bool isAccumulatorMode){
 	if(isAccumulatorMode){
 		temp = a;
 	}else{
-		temp = bus->getValue(address);
+		temp = bus->cpuRead(address);
 	}
 
 	uint8_t c = temp & (1 << 7);
@@ -453,7 +453,7 @@ void CPU6502::asl(uint16_t address, bool isAccumulatorMode){
 	if(isAccumulatorMode){
 		a = temp;	
 	}else{
-		bus->setValue(address, temp);
+		bus->cpuWrite(address, temp);
 	}
 }
 
@@ -463,7 +463,7 @@ void CPU6502::lsr(uint16_t address, bool isAccumulatorMode){
 	if(isAccumulatorMode){
 		temp = a;
 	}else{
-		temp = bus->getValue(address);
+		temp = bus->cpuRead(address);
 	}
 	
 	bool c = temp & 1;
@@ -480,7 +480,7 @@ void CPU6502::lsr(uint16_t address, bool isAccumulatorMode){
 	if(isAccumulatorMode){ 
 		a = temp;
 	}else{
-		bus->setValue(address, temp);
+		bus->cpuWrite(address, temp);
 	}
 }
 
@@ -490,7 +490,7 @@ void CPU6502::rol(uint16_t address, bool isAccumulatorMode){
 	if(isAccumulatorMode){
 		temp = a;
 	}else{
-		temp = bus->getValue(address);
+		temp = bus->cpuRead(address);
 	}
 
 	bool bitSeven = temp & (1 << 7);
@@ -511,7 +511,7 @@ void CPU6502::rol(uint16_t address, bool isAccumulatorMode){
 	if(isAccumulatorMode){ 
 		a = temp;
 	}else{
-		bus->setValue(address, temp);
+		bus->cpuWrite(address, temp);
 	}
 }
 
@@ -521,7 +521,7 @@ void CPU6502::ror(uint16_t address, bool isAccumulatorMode){
 	if(isAccumulatorMode){
 		temp = a;
 	}else{
-		temp = bus->getValue(address);
+		temp = bus->cpuRead(address);
 	}
 
 	bool bitZero = temp & 1;
@@ -542,7 +542,7 @@ void CPU6502::ror(uint16_t address, bool isAccumulatorMode){
 	if(isAccumulatorMode){ 
 		a = temp;
 	}else{
-		bus->setValue(address, temp);
+		bus->cpuWrite(address, temp);
 	}
 }
 
@@ -557,9 +557,9 @@ void CPU6502::jmp(uint16_t address){
 
 // Jump to Subroutine
 void CPU6502::jsr(uint16_t address){
-	bus->setValue(s | 0x100, pc >> 8);
+	bus->cpuWrite(s | 0x100, pc >> 8);
 	s--;
-	bus->setValue(s | 0x100, pc);
+	bus->cpuWrite(s | 0x100, pc);
 	s--;
 	pc = address - 1;
 }
@@ -567,9 +567,9 @@ void CPU6502::jsr(uint16_t address){
 // Return from Subroutine
 void CPU6502::rts(){
 	s++;
-	pc = bus->getValue(s | 0x100);
+	pc = bus->cpuRead(s | 0x100);
 	s++;
-	pc |= bus->getValue(s | 0x100) << 8;
+	pc |= bus->cpuRead(s | 0x100) << 8;
 }
 
 /*
@@ -694,15 +694,15 @@ void CPU6502::sei(){
 
 // Force an Interrupt
 void CPU6502::brk(){
-	bus->setValue(s | 0x100, pc);
+	bus->cpuWrite(s | 0x100, pc);
 	s--;
-	bus->setValue(s | 0x100, pc >> 8);
+	bus->cpuWrite(s | 0x100, pc >> 8);
 	s--;
-	bus->setValue(s | 0x100, p);
+	bus->cpuWrite(s | 0x100, p);
 	s--;
 
-	uint16_t temp = bus->getValue(0xFFFE);
-	temp = temp | bus->getValue(0xFFFF) << 8;
+	uint16_t temp = bus->cpuRead(0xFFFE);
+	temp = temp | bus->cpuRead(0xFFFF) << 8;
 
 	pc = temp;
 
@@ -717,11 +717,11 @@ void CPU6502::nop(){
 // Return from Interrupt
 void CPU6502::rti(){
 	s++;
-	p = bus->getValue(s | 0x100);
+	p = bus->cpuRead(s | 0x100);
 	s++;
-	pc = bus->getValue(s | 0x100);
+	pc = bus->cpuRead(s | 0x100);
 	s++;
-	pc |= bus->getValue(s | 0x100) << 8;
+	pc |= bus->cpuRead(s | 0x100) << 8;
 	
 	pc--;
 }
@@ -731,19 +731,19 @@ void CPU6502::irq(){
 }
 
 void CPU6502::nmi(){
-	bus->setValue(s | 0x100, pc);
+	bus->cpuWrite(s | 0x100, pc >> 8);
 	s--;
-	bus->setValue(s | 0x100, pc >> 8);
+	bus->cpuWrite(s | 0x100, pc);
 	s--;
 	
-	handleFlag(Break, 0);
 	handleFlag(Interrupt, 1);
+	handleFlag(Break, 0);
 	
-	bus->setValue(s | 0x100, p);
+	bus->cpuWrite(s | 0x100, p);
 	s--;
 
-	uint16_t temp = bus->getValue(0xFFFA);
-	temp = temp | bus->getValue(0xFFFB) << 8;
+	uint16_t temp = bus->cpuRead(0xFFFA);
+	temp = temp | bus->cpuRead(0xFFFB) << 8;
 
 	pc = temp;
 }
@@ -770,55 +770,55 @@ uint16_t CPU6502::getModeInstruction(int mode){
 	pc++;
 
 	if(mode == Immediate){ // Immediate
-		return bus->getValue(pc); 
+		return bus->cpuRead(pc); 
 	}
 
 	if(mode == ZeroPage){ // Zero Page
-		return bus->getValue(pc);
+		return bus->cpuRead(pc);
 	}
 
 	if(mode == ZeroPageX){ // Zero Page X
-		uint8_t address = bus->getValue(pc);
+		uint8_t address = bus->cpuRead(pc);
 		return (uint8_t)(address + x);
 	}
 
 	if(mode == ZeroPageY){
-		uint8_t address = bus->getValue(pc);
+		uint8_t address = bus->cpuRead(pc);
 		return (uint8_t)(address + y);
 	}
 
 	if(mode == Relative){
-		uint8_t displacement = bus->getValue(pc);
+		uint8_t displacement = bus->cpuRead(pc);
 		return displacement;
 	}
 
 	if(mode == Absolute){ // Absolute
-		uint16_t address = bus->getValue(pc) | (bus->getValue(++pc) << 8);
+		uint16_t address = bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
 		return address;
 	}
 
 	if(mode == AbsoluteX){ // Absolute X
-	 	uint16_t address = (uint8_t)(bus->getValue(pc) | (bus->getValue(++pc) << 8) + x);
+	 	uint16_t address = (uint8_t)(bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8) + x);
 		return address;
 	}
 
 	if(mode == AbsoluteY){ // Absolute Y
-		uint16_t address = (uint8_t)(bus->getValue(pc) | (bus->getValue(++pc) << 8) + y);
+		uint16_t address = (uint8_t)(bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8) + y);
 		return address;
 	}
 
 	if(mode == IndexedIndirect){ // Index Indirect
-		uint8_t temp = bus->getValue(pc);
+		uint8_t temp = bus->cpuRead(pc);
 		uint8_t temp2 = temp + x;
-		uint8_t temp3 = bus->getValue(temp2) | (bus->getValue(temp2 + 1) << 8);
-		return bus->getValue(temp3);
+		uint8_t temp3 = bus->cpuRead(temp2) | (bus->cpuRead(temp2 + 1) << 8);
+		return bus->cpuRead(temp3);
 	}
 
 	if(mode == IndirectIndexed){ // Indirect Index
-		uint8_t temp = bus->getValue(pc);
-		uint8_t temp2 = bus->getValue(temp);
+		uint8_t temp = bus->cpuRead(pc);
+		uint8_t temp2 = bus->cpuRead(temp);
 		uint8_t temp3 = temp2 + y;
-		return bus->getValue(temp3);
+		return bus->cpuRead(temp3);
 	}
 
 	return 0;
@@ -832,43 +832,43 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0xA5){
 		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		lda(value);
 	}
 
 	if(opcode == 0xB5){
 		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		lda(value);
 	}
 
 	if(opcode == 0xAD){
 		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		lda(value);
 	}
 
 	if(opcode == 0xBD){
 		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		lda(value);
 	}
 
 	if(opcode == 0xB9){
 		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		lda(value);
 	}
 
 	if(opcode == 0xA1){
 		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		lda(value);
 	}
 
 	if(opcode == 0xB1){
 		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		lda(value);
 	}
 
@@ -879,25 +879,25 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0xA6){
 		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ldx(value);
 	}
 
 	if(opcode == 0xB6){
 		uint16_t address = getModeInstruction(ZeroPageY);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ldx(value);
 	}
 
 	if(opcode == 0xAE){
 		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ldx(value);
 	}
 
 	if(opcode == 0xBE){
 		uint16_t address = getModeInstruction(AbsoluteX);
-		uint16_t value = bus->getValue(address);
+		uint16_t value = bus->cpuRead(address);
 		ldx(value);
 	}
 
@@ -908,25 +908,25 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0xA4){
 		uint16_t address = getModeInstruction(ZeroPage);
-		uint16_t value = bus->getValue(address);
+		uint16_t value = bus->cpuRead(address);
 		ldy(value);
 	}
 
 	if(opcode == 0xB4){
 		uint16_t address = getModeInstruction(ZeroPageX);
-		uint16_t value = bus->getValue(address);
+		uint16_t value = bus->cpuRead(address);
 		ldy(value);
 	}
 
 	if(opcode == 0xAC){
 		uint16_t address = getModeInstruction(Absolute);
-		uint16_t value = bus->getValue(address);
+		uint16_t value = bus->cpuRead(address);
 		ldy(value);
 	}
 
 	if(opcode == 0xBC){
 		uint16_t address = getModeInstruction(AbsoluteX);
-		uint16_t value = bus->getValue(address);
+		uint16_t value = bus->cpuRead(address);
 		ldy(value);
 	}
 
@@ -1042,43 +1042,43 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0x25){
 		uint8_t address = getModeInstruction(ZeroPage);
-		int8_t value = bus->getValue(address);
+		int8_t value = bus->cpuRead(address);
 		andL(value);
 	}
 
 	if(opcode == 0x35){
 		uint8_t address = getModeInstruction(ZeroPageX);
-		int8_t value = bus->getValue(address);
+		int8_t value = bus->cpuRead(address);
 		andL(value);
 	}
 
 	if(opcode == 0x2D){
 		uint8_t address = getModeInstruction(Absolute);
-		int8_t value = bus->getValue(address);
+		int8_t value = bus->cpuRead(address);
 		andL(value);
 	}
 
 	if(opcode == 0x3D){
 		uint8_t address = getModeInstruction(AbsoluteX);
-		int8_t value = bus->getValue(address);
+		int8_t value = bus->cpuRead(address);
 		andL(value);
 	}
 
 	if(opcode == 0x39){
 		uint8_t address = getModeInstruction(AbsoluteY);
-		int8_t value = bus->getValue(address);
+		int8_t value = bus->cpuRead(address);
 		andL(value);
 	}
 
 	if(opcode == 0x21){
 		uint8_t address = getModeInstruction(IndexedIndirect);
-		int8_t value = bus->getValue(address);
+		int8_t value = bus->cpuRead(address);
 		andL(value);
 	}
 
 	if(opcode == 0x31){
 		uint8_t address = getModeInstruction(IndirectIndexed);
-		int8_t value = bus->getValue(address);
+		int8_t value = bus->cpuRead(address);
 		andL(value);
 	}
 
@@ -1089,43 +1089,43 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0x45){
 		uint8_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		eor(value);
 	}
 
 	if(opcode == 0x55){
 		uint8_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		eor(value);
 	}
 
 	if(opcode == 0x4D){
 		uint8_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		eor(value);
 	}
 
 	if(opcode == 0x5D){
 		uint8_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		eor(value);
 	}
 
 	if(opcode == 0x59){
 		uint8_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		eor(value);
 	}
 
 	if(opcode == 0x41){
 		uint8_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		eor(value);
 	}
 
 	if(opcode == 0x51){
 		uint8_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		eor(value);
 	}
 
@@ -1136,55 +1136,55 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0x05){
 		uint8_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ora(value);
 	}
 
 	if(opcode == 0x15){
 		uint8_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ora(value);
 	}
 
 	if(opcode == 0x0D){
 		uint8_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ora(value);
 	}
 
 	if(opcode == 0x1D){
 		uint8_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ora(value);
 	}
 
 	if(opcode == 0x19){
 		uint8_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ora(value);
 	}
 
 	if(opcode == 0x01){
 		uint8_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ora(value);
 	}
 
 	if(opcode == 0x11){
 		uint8_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		ora(value);
 	}
 
 	if(opcode == 0x24){
 		uint8_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		bit(value);
 	}
 
 	if(opcode == 0x2C){
 		uint8_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		bit(value);
 	}
 
@@ -1195,43 +1195,43 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0x65){
 		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		adc(value);
 	}
 
 	if(opcode == 0x75){
 		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		adc(value);
 	}
 
 	if(opcode == 0x6D){
 		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		adc(value);
 	}
 
 	if(opcode == 0x7D){
 		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		adc(value);
 	}
 
 	if(opcode == 0x79){
 		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		adc(value);
 	}
 
 	if(opcode == 0x61){
 		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		adc(value);
 	}
 
 	if(opcode == 0x71){
 		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		adc(value);
 	}
 
@@ -1242,43 +1242,43 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0xE5){
 		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 	}
 
 	if(opcode == 0xF5){
 		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 	}
 
 	if(opcode == 0xED){
 		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 	}
 
 	if(opcode == 0xFD){
 		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 	}
 
 	if(opcode == 0xF9){
 		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 	}
 
 	if(opcode == 0xE1){
 		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 	}
 
 	if(opcode == 0xF1){
 		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 	}
 
@@ -1289,37 +1289,37 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0xC5){
 		uint8_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 	}
 	
 	if(opcode == 0xCD){
 		uint8_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 	}
 	
 	if(opcode == 0xDD){
 		uint8_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 	}
 	
 	if(opcode == 0xD9){
 		uint8_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 	}
 	
 	if(opcode == 0xC1){
 		uint8_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 	}
 	
 	if(opcode == 0xD1){
 		uint8_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 	}
 
@@ -1330,13 +1330,13 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0xE4){
 		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cpx(value);
 	}
 
 	if(opcode == 0xEC){
 		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cpx(value);
 	}
 
@@ -1347,13 +1347,13 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0xC4){
 		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cpy(value);
 	}
 
 	if(opcode == 0xCC){
 		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->getValue(address);
+		uint8_t value = bus->cpuRead(address);
 		cpy(value);
 	}
 
