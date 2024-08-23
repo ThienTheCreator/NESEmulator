@@ -4,6 +4,7 @@
 #include <stdlib.h>  
 
 #include "ppu2C02.h"
+#include "window.h"
 
 using namespace std;
 
@@ -76,13 +77,6 @@ void PPU2C02::setupColor(){
 
 PPU2C02::PPU2C02(){
 	setupColor();
-
-	HANDLE thread = CreateThread(NULL, 0, ep, NULL, 0, NULL);
-	
-	for(int i = 0; i < 255; i++){
-		getidle();
-		Sleep(100);
-	}
 }
 
 void PPU2C02::setValue(uint16_t address, uint8_t value){
@@ -180,16 +174,26 @@ void PPU2C02::reset(){
 	ppudata = 0;
 }
 
-void PPU2C02::executePPU(){
-	HANDLE thread = CreateThread(NULL, 0, ep, NULL, 0, NULL);	
+void PPU2C02::loadShiftRegister(){
+	shiftRegPatternLs = (shiftRegPatternLs & 0xFF00) | nextTileBgLs;
+	shiftRegPatternMs = (shiftRegPatternMs & 0xFF00) | nextTileBgMs;
+}
 
+uint32_t PPU2C02::getColor(uint8_t palette, uint8_t pixel){
+	return color[getValue(0x3F00 + (palette << 2) + pixel) & 0x3F];
+};
+
+void PPU2C02::executePPU(){
 	if(0 <= scanline && scanline <= 239){
 		if((1 <= cycle && cycle <= 256) || (321 <= cycle && cycle <= 336)){
 			if((cycle - 1) % 8 == 0){
+				loadShiftRegister();
 				nextTileId = getValue(0x2000 | (v.reg & 0xFFF));
 			}
 			if((cycle - 1) % 8 == 2){
 				nextTileAttribute = getValue(0x23C0 | (v.reg & 0x0C00) | ((v.reg >> 4) & 0x38) | ((v.reg >> 2) & 0x7));
+				shiftRegAttributeLs = nextTileAttribute & 0b01 ? 1 : 0;
+				shiftRegAttributeMs = nextTileAttribute & 0b10 ? 2 : 0;
 			}
 			if((cycle - 1) % 8 == 4){
 				nextTileBgLs = getValue(control.s << 12 | nextTileId << 4 | v.fineY);
@@ -228,7 +232,26 @@ void PPU2C02::executePPU(){
 		if(cycle == 257){
 			v.reg = (v.reg & ~0x41F) | (t.reg & 0x41F);
 		}
-		
+
+		uint8_t bg_pixel = 0;
+		uint8_t bg_palette = 0;
+		if(mask.b){
+			uint16_t bit_mux = 0x8000 >> x;
+
+			uint8_t pixelLs = (shiftRegPatternLs & bit_mux) != 0;
+			uint8_t pixelMs = (shiftRegPatternMs & bit_mux) != 0;
+			uint8_t bg_pixel = (pixelMs << 1) | pixelLs;
+
+			uint8_t bg_palette = (shiftRegPatternMs & 0b10) | (shiftRegPatternLs & 0b01);
+		}	
+
+		uint8_t bgColor = getColor(bg_palette, bg_pixel);
+		windowPixelColor[cycle % 61440] = bgColor;
+		for(int i = 0; i < 61440; i++){
+			windowPixelColor[i] = 0xFFFFFF00;
+		}
+		updateScreen(windowPixelColor);
+
 		cycle++;
 		if(cycle >= 341){
 			cycle = 0;

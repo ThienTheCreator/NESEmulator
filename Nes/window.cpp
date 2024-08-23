@@ -54,15 +54,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-int CALLBACK getidle(){
+void updateScreen(uint32_t arr[windowWidth * windowHeight]){
 	for(int i = 0; i < windowWidth * windowHeight; i++){
-		windowPixelColor[i] = tempColor;
+		windowPixelColor[i] = arr[i];
 	}
 	
-	tempColor += 0x01010100;
 	InvalidateRect(wind, NULL, 0);
-
-	return 0;
 }
 
 DWORD WINAPI ep(void* data){

@@ -13,7 +13,6 @@ public:
 	PPU2C02 ppu;
 
 	void writeCartridge(uint16_t address, uint8_t value);
-	void loadCpuRom();
 	void loadPpuRom();
 	void loadCartridge();
 
@@ -22,4 +21,6 @@ public:
 
 	uint8_t cpuRead(uint16_t address);
 	void cpuWrite(uint16_t address, uint8_t value);
+
+	void clock();
 };

@@ -17,6 +17,8 @@ public:
 	
 	uint8_t p = 0; // status register
 
+	uint8_t waitCycle = 0; // cycles taken for an instruction
+
 	CPU6502(){
 		pc = 0xFFFC;
 		s = 0xFD;
@@ -25,6 +27,16 @@ public:
 	}
 
 	void connectBus(Bus* b){ bus = b; }
+
+	enum flag{
+		Carry = 0,
+		Zero = 1,
+		Interrupt = 2,
+		Decimal = 3,
+		Break = 4,
+		Overflow = 6,
+		Negative = 7
+	};
 
 	void setFlag(uint8_t bit);
 
@@ -253,6 +265,21 @@ public:
 		
 	// Return from Interrupt
 	void rti();
+
+
+	enum addressingMode{
+		Immediate = 10,
+		ZeroPage = 11,
+		ZeroPageX = 12,
+		ZeroPageY = 13,
+		Relative = 14,
+		Absolute = 15,
+		AbsoluteX = 16,
+		AbsoluteY = 17,
+		Indirect = 18,
+		IndexedIndirect = 19,
+		IndirectIndexed = 20
+	};
 
 	uint16_t getModeInstruction(int);
 

@@ -9,6 +9,9 @@
 
 class PPU2C02{
 	uint32_t color[64];
+	static const uint16_t width = 256;
+	static const uint16_t height = 240;
+	uint32_t screen[width * height];
 
 	uint8_t patternTable[2][4096];
 	uint8_t nameTable[4][1024];
@@ -41,13 +44,15 @@ class PPU2C02{
 	uint8_t nextTileBgLs = 0;
 	uint8_t nextTileBgMs = 0;
 
-	uint8_t shiftAttributeLs = 0;
-	uint8_t shiftAttributeMs = 0;
-	uint16_t shiftPatternLs = 0;
-	uint16_t shiftPatternMs = 0;
+	uint16_t shiftRegPatternLs = 0;
+	uint16_t shiftRegPatternMs = 0;
+	uint8_t shiftRegAttributeLs = 0;
+	uint8_t shiftRegAttributeMs = 0;
 
 	uint16_t scanline = 0;
 	uint16_t cycle = 0;
+
+	HANDLE thread = CreateThread(NULL, 0, ep, NULL, 0, NULL);
 public:
 	union PPUCTRL{
 		struct {
@@ -96,6 +101,7 @@ public:
 	PPU2C02();
 
 	void setupColor();
+	uint32_t getColor(uint8_t palette, uint8_t pixel);
 
 	uint8_t getValue(uint16_t address);
 	void setValue(uint16_t address, uint8_t value);
@@ -104,6 +110,6 @@ public:
 	void write(uint16_t address, uint8_t value);
 
 	void reset();
-
+	void loadShiftRegister();
 	void executePPU();
 };
