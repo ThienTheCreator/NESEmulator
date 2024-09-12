@@ -29,32 +29,16 @@ void Bus::loadCartridge(){
 
 	myfile.close();
 
-	// loadPpuRom();
+	loadPpuRom();
 }
-
-void Bus::cpuWrite(uint16_t address, uint8_t value){
-	if(address == 0x2006){
-		ppu.ppuaddr = value;
-	}
-	if(address == 0x2007){
-		ppu.ppudata = value;
-	}
-	if( 0 <= address && address <= 0x1FFF){
-		cpuRam[address] = value;
-	}
-};
 
 uint8_t Bus::cpuRead(uint16_t address){
 	if(0 <= address && address <= 0x1FFF){
-		return cpuRam[address];
+		return cpuRam[address % 0x800];
 	}
-	if(address == 0x2002){
-		uint8_t temp = ppu.status.reg;
-		ppu.status.V = 0;
-		return temp;
-	}
-	if(address == 0x2007){
-		return ppu.ppudata;
+	
+	if(0x2000 <= address && address <= 0x3FFF){
+		return ppu.read(0x2000 | (address % 0x8));
 	}
 
 	if( 0x8000 <= address && address <= 0xBFFF){
@@ -68,13 +52,27 @@ uint8_t Bus::cpuRead(uint16_t address){
 	return 0xFF;
 };
 
-uint8_t Bus::ppuRead(uint16_t address){
-	return ppu.read(address);
-}
+void Bus::cpuWrite(uint16_t address, uint8_t value){
+	if( 0 <= address && address <= 0x1FFF){
+		cpuRam[address % 0x800] = value;
+	}
 
-void Bus::ppuWrite(uint16_t address, uint8_t value){
-	ppu.write(address, value);
-}
+	if(0x2000 <= address && address <= 0x3FFF){
+		ppu.write(0x2000 | (address % 0x8), value);
+	}
+
+	if(address == 0x4014){
+		ppu.write(0x4014, value);
+	}
+
+	if( 0x8000 <= address && address <= 0xBFFF){
+		cartridge[address - 0x8000] = value;		
+	}
+
+	if( 0xC000 <= address && address <= 0xFFFF){
+		cartridge[address - 0xC000] = value;		
+	}
+};
 
 void Bus::clock(){
 	uint16_t test = cpuRead(0xfffc);
@@ -83,37 +81,18 @@ void Bus::clock(){
 	cpu.pc = test;
 
 	int temp = 0;
-	int instructionCount = 0;
-	while(temp < 16384 * 3 && instructionCount < 128){
+	while(temp < 16384 * 1000){
+		ppu.clock();
+		
 		if(temp % 3 == 0){
-			if(cpu.waitCycle <= 0){
-				if(1){ // debug
-					cout << uppercase << hex;
-					cout << "PC:" << setw(4) << cpu.pc;
-					cout << " A:" << setfill('0') << setw(2) << (int)cpu.a;
-					cout <<	" X:" << setfill('0') << setw(2) << (int)cpu.x;
-					cout << " Y:" << setfill('0') << setw(2) << (int)cpu.y; 
-					cout << " S:" << setfill('0') << setw(2) << (int)cpu.s;
-					cout << " P:";
-					cout << (0b10000000 & cpu.p ? "N" : "n");
-					cout << (0b01000000 & cpu.p ? "V" : "v");
-					cout << "u";
-					cout << (0b00010000 & cpu.p ? "B" : "b");
-					cout << (0b00001000 & cpu.p ? "D" : "d");
-					cout << (0b00000100 & cpu.p ? "I" : "i");
-					cout << (0b00000010 & cpu.p ? "Z" : "z");
-					cout << (0b00000001 & cpu.p ? "C" : "c");
-					cout << endl;
-				}
-				cpu.executeInstruction(cpuRead(cpu.pc));
-				instructionCount++;
-			} else {
-				cpu.waitCycle--;
-			}
+			cpu.clock();
 		}
-		if(1){
-		 	ppu.executePPU();
+	
+		if(ppu.nmi){
+			ppu.nmi = false;
+			cpu.nmi();
 		}
+
 		temp++;
 	}
 }

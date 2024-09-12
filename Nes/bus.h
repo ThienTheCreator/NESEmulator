@@ -16,9 +16,6 @@ public:
 	void loadPpuRom();
 	void loadCartridge();
 
-	uint8_t ppuRead(uint16_t);
-	void ppuWrite(uint16_t address, uint8_t value);
-
 	uint8_t cpuRead(uint16_t address);
 	void cpuWrite(uint16_t address, uint8_t value);
 

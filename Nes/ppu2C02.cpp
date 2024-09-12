@@ -9,68 +9,68 @@
 using namespace std;
 
 void PPU2C02::setupColor(){
-	color[0]  = 0x55555500;
-	color[1]  = 0x00177300;
-	color[2]  = 0xffff8600;
-	color[3]  = 0x2e057800;
-	color[4]  = 0x59024d00;
-	color[5]  = 0x72001100;
-	color[6]  = 0x6e000000;
-	color[7]  = 0x4c080000;
-	color[8]  = 0x171b0000;
-	color[9]  = 0x002a0000;
-	color[10] = 0x00310000;
-	color[11] = 0x002e0800;
-	color[12] = 0x00264500;
+	color[0]  = 0x62626200;
+	color[1]  = 0x01209000;
+	color[2]  = 0x240BA000;
+	color[3]  = 0x47009000;
+	color[4]  = 0x60006200;
+	color[5]  = 0x6A002400;
+	color[6]  = 0x60110000;
+	color[7]  = 0x47270000;
+	color[8]  = 0x243C0000;
+	color[9]  = 0x014A0000;
+	color[10] = 0x004F0000;
+	color[11] = 0x00472400;
+	color[12] = 0x00366200;
 	color[13] = 0x00000000;
 	color[14] = 0x00000000;
 	color[15] = 0x00000000;
-	color[16] = 0xffffa500;
-	color[17] = 0xffffc600;
-	color[18] = 0xffffe500;
-	color[19] = 0xffffd900;
-	color[20] = 0xffffa600;
-	color[21] = 0xd2175900;
-	color[22] = 0xd1210700;
-	color[23] = 0xa7370000;
-	color[24] = 0x63510000;
-	color[25] = 0x18670000;
-	color[26] = 0x00720000;
-	color[27] = 0x00733100;
-	color[28] = 0xffff8400;
+	color[16] = 0xABABAB00;
+	color[17] = 0x1F56E100;
+	color[18] = 0x4D39FF00;
+	color[19] = 0x7E23EF00;
+	color[20] = 0xA31BB700;
+	color[21] = 0xB4226400;
+	color[22] = 0xAC370E00;
+	color[23] = 0x8C550000;
+	color[24] = 0x5E720000;
+	color[25] = 0x2D880000;
+	color[26] = 0x07900000;
+	color[27] = 0x00894700;
+	color[28] = 0x00739D00;
 	color[29] = 0x00000000;
 	color[30] = 0x00000000;
 	color[31] = 0x00000000;
-	color[32] = 0xffffff00;
-	color[33] = 0xffffff00;
-	color[34] = 0xffffff00;
-	color[35] = 0xffffff00;
-	color[36] = 0xffffff00;
-	color[37] = 0xffffbd00;
-	color[38] = 0xff7e7500;
-	color[39] = 0xff8a2b00;
-	color[40] = 0xffa00000;
-	color[41] = 0xffb80200;
-	color[42] = 0xffc83000;
-	color[43] = 0xffcd7b00;
-	color[44] = 0xffffd000;
-	color[45] = 0x3c3c3c00;
+	color[32] = 0xFFFFFF00;
+	color[33] = 0x67ACFF00;
+	color[34] = 0x958DFF00;
+	color[35] = 0xC875FF00;
+	color[36] = 0xF26AFF00;
+	color[37] = 0xFF6FC500;
+	color[38] = 0xFF836A00;
+	color[39] = 0xE6A01F00;
+	color[40] = 0xB8BF0000;
+	color[41] = 0x85D80100;
+	color[42] = 0x5BE33500;
+	color[43] = 0x45DE8800;
+	color[44] = 0x49CAE300;
+	color[45] = 0x4E4E4E00;
 	color[46] = 0x00000000;
 	color[47] = 0x00000000;
-	color[48] = 0xffffff00;
-	color[49] = 0xffffff00;
-	color[50] = 0xffffff00;
-	color[51] = 0xffffff00;
-	color[52] = 0xffffff00;
-	color[53] = 0xffffea00;
-	color[54] = 0xffffc900;
-	color[55] = 0xffffaa00;
-	color[56] = 0xffff9600;
-	color[57] = 0xffff9500;
-	color[58] = 0xffffa500;
-	color[59] = 0xffffc300;
-	color[60] = 0xffffe600;
-	color[61] = 0xffffaf00;
+	color[48] = 0xFFFFFF00;
+	color[49] = 0xBFE0FF00;
+	color[50] = 0xD1D3FF00;
+	color[51] = 0xE6C9FF00;
+	color[52] = 0xF7C3FF00;
+	color[53] = 0xFFC4EE00;
+	color[54] = 0xFFCBC900;
+	color[55] = 0xF7D7A900;
+	color[56] = 0xE6E39700;
+	color[57] = 0xD1EE9700;
+	color[58] = 0xBFF3A900;
+	color[59] = 0xB5F2C900;
+	color[60] = 0xB5EBEE00;
+	color[61] = 0xB8B8B800;
 	color[62] = 0x00000000;
 	color[63] = 0x00000000;
 }
@@ -127,18 +127,80 @@ uint8_t PPU2C02::getValue(uint16_t address){
 
 // communication used by cpu
 uint8_t PPU2C02::read(uint16_t address){
-	if(address == 0x2002){
-		w = 0;
+	if(address == 0x2000){
+		ppuGenLatch = ppuctrl.reg;
 	}
-	return 0;
+
+	if(address == 0x2001){
+		ppuGenLatch = ppumask.reg;
+	}
+
+	if(address == 0x2002){
+		ppuGenLatch = ppustatus.reg;
+		uint8_t temp = ppustatus.reg;
+		ppustatus.V = 0;
+		w = 0;
+		return temp;
+	}
+
+	if(address == 0x2003){
+		ppuGenLatch = oamaddr;
+	}
+
+	if(address == 0x2004){
+		ppuGenLatch = oamdata;
+		return oamdata;
+	}
+
+	if(address == 0x2005){
+		ppuGenLatch = ppuscroll;
+	}
+
+	if(address == 0x2006){
+		ppuGenLatch = ppuaddr;
+	}
+
+	if(address == 0x2007){
+		ppudata = ppudataBuffer;
+		ppudataBuffer = getValue(v.reg);
+		
+		v.reg += ppuctrl.i ? 32 : 1;
+		
+		ppuGenLatch = ppudata;
+	}
+
+	return ppuGenLatch;
 }
 
 // communication used by cpu
 void PPU2C02::write(uint16_t address, uint8_t value){
+	if(address == 0x4014){
+		// TODO
+		return;
+	}
+
 	if(address == 0x2000){
-		control.reg = value;
+		ppuctrl.reg = value;
 		t.nametable = value;
-	} else if(address == 0x2005){
+	} 
+
+	if(address == 0x2001){
+		ppumask.reg = value;
+	}
+
+	if(address == 0x2002){
+		w = 0;
+	}
+
+	if(address == 0x2003){
+		oamaddr = value;
+	}
+
+	// TODO
+	if(address == 0x2004){
+	}
+
+	if(address == 0x2005){
 		ppuscroll = value;
 		if(w == 0){ // first write
 			t.coarseX = ppuscroll >> 3;
@@ -149,20 +211,28 @@ void PPU2C02::write(uint16_t address, uint8_t value){
 			t.coarseY = ppuscroll >> 3;
 			w = 0;
 		}
-	} else if(address == 0x2006){
-		ppuaddr = value;
+	}
+
+	if(address == 0x2006){
 		if(w == 0){ // first write
-			t.fineY = ppuaddr >> 4;
-			t.nametable = ppuaddr >> 2;
+			t.fineY = value >> 4;
+			t.nametable = value >> 2;
 			t.coarseY << 3;
 			t.fineY |= 1 << 2;
 			w = 1;
 		} else {    // second write
-			t.reg |= ppuaddr;
+			t.reg |= value;
 			v = t;
 			w = 0;
 		}
 	}
+
+	if(address == 0x2007){
+		setValue(v.reg, value);
+		v.reg += ppuctrl.i ? 32 : 1;
+	}
+
+	ppuGenLatch = value;
 }
 
 void PPU2C02::reset(){
@@ -177,40 +247,60 @@ void PPU2C02::reset(){
 void PPU2C02::loadShiftRegister(){
 	shiftRegPatternLs = (shiftRegPatternLs & 0xFF00) | nextTileBgLs;
 	shiftRegPatternMs = (shiftRegPatternMs & 0xFF00) | nextTileBgMs;
+
+	shiftRegAttributeLs = (shiftRegAttributeLs & 0xFF00) | ((nextTileAttribute & 0b01) ? 0xFF : 0x00);
+	shiftRegAttributeMs = (shiftRegAttributeMs & 0xFF00) | ((nextTileAttribute & 0b10) ? 0xFF : 0x00);
+}
+
+void PPU2C02::updateShifter(){
+	if(ppumask.b){
+		shiftRegPatternLs <<= 1;
+		shiftRegPatternMs <<= 1;
+
+		shiftRegAttributeLs <<= 1;
+		shiftRegAttributeMs <<= 1;
+	}
 }
 
 uint32_t PPU2C02::getColor(uint8_t palette, uint8_t pixel){
 	return color[getValue(0x3F00 + (palette << 2) + pixel) & 0x3F];
 };
 
-void PPU2C02::executePPU(){
-	if(0 <= scanline && scanline <= 239){
-		if((1 <= cycle && cycle <= 256) || (321 <= cycle && cycle <= 336)){
+void PPU2C02::clock(){
+	if(-1 <= scanline && scanline <= 239){
+		if(scanline == -1 && cycle == 1){
+			ppustatus.V = false;
+		}
+
+		if(scanline == 0 && cycle == 0)
+			cycle = 1;
+
+		if((2 <= cycle && cycle <= 258) || (321 <= cycle && cycle <= 338)){
+			updateShifter();
+
 			if((cycle - 1) % 8 == 0){
 				loadShiftRegister();
 				nextTileId = getValue(0x2000 | (v.reg & 0xFFF));
 			}
 			if((cycle - 1) % 8 == 2){
 				nextTileAttribute = getValue(0x23C0 | (v.reg & 0x0C00) | ((v.reg >> 4) & 0x38) | ((v.reg >> 2) & 0x7));
-				shiftRegAttributeLs = nextTileAttribute & 0b01 ? 1 : 0;
-				shiftRegAttributeMs = nextTileAttribute & 0b10 ? 2 : 0;
 			}
 			if((cycle - 1) % 8 == 4){
-				nextTileBgLs = getValue(control.s << 12 | nextTileId << 4 | v.fineY);
+				nextTileBgLs = getValue(ppuctrl.s << 12 | nextTileId << 4 | v.fineY);
 			}
 			if((cycle - 1) % 8 == 6){
-				nextTileBgMs = getValue(control.s << 12 | nextTileId << 4 | (v.fineY + 8));
+				nextTileBgMs = getValue(ppuctrl.s << 12 | nextTileId << 4 | (v.fineY + 8));
 			}
 			if((cycle - 1) % 8 == 7){
 				if((v.reg & 0x001F) == 31){
 					v.reg &= ~0x001F;
-					v.reg ^= 0x04000;
+					v.reg ^= 0x0400;
 				} else {
 					v.reg += 1;
 				}
 			}
 		}
-	
+
 		if(cycle == 256){
 			if((v.reg & 0x7000) != 0x7000){
 				v.reg += 0x1000;
@@ -219,7 +309,7 @@ void PPU2C02::executePPU(){
 				uint16_t y = (v.reg & 0x03E0) >> 5;
 				if (y == 29){
 					y = 0;
-					v.reg ^= 0x8000;
+					v.reg ^= 0x0800;
 				} else if(y == 31){
 					y = 0;
 				} else {
@@ -230,37 +320,48 @@ void PPU2C02::executePPU(){
 		}
 
 		if(cycle == 257){
-			v.reg = (v.reg & ~0x41F) | (t.reg & 0x41F);
-		}
-
-		uint8_t bg_pixel = 0;
-		uint8_t bg_palette = 0;
-		if(mask.b){
-			uint16_t bit_mux = 0x8000 >> x;
-
-			uint8_t pixelLs = (shiftRegPatternLs & bit_mux) != 0;
-			uint8_t pixelMs = (shiftRegPatternMs & bit_mux) != 0;
-			uint8_t bg_pixel = (pixelMs << 1) | pixelLs;
-
-			uint8_t bg_palette = (shiftRegPatternMs & 0b10) | (shiftRegPatternLs & 0b01);
-		}	
-
-		uint8_t bgColor = getColor(bg_palette, bg_pixel);
-		windowPixelColor[cycle % 61440] = bgColor;
-		for(int i = 0; i < 61440; i++){
-			windowPixelColor[i] = 0xFFFFFF00;
-		}
-		updateScreen(windowPixelColor);
-
-		cycle++;
-		if(cycle >= 341){
-			cycle = 0;
-			scanline++;
-			
-			if(scanline >= 261){
-				scanline = -1;
+			if(ppumask.b){
+				v.reg = (v.reg & ~0x41F) | (t.reg & 0x41F);
 			}
 		}
+
+		if(cycle == 338 || cycle == 340){
+			nextTileId = read(0x2000 | (v.reg & 0xFFF));
+		}
+	}
+
+	if(241 <= scanline && scanline <= 260){
+		ppustatus.V = true;
+
+		if(ppuctrl.v)
+			nmi = true;
+	}
+
+	uint8_t bg_pixel = 0;
+	uint8_t bg_palette = 0;
+	if(ppumask.b){
+		uint16_t bit_mux = 0x8000 >> x;
+
+		uint8_t pixelLs = (shiftRegPatternLs & bit_mux) != 0;
+		uint8_t pixelMs = (shiftRegPatternMs & bit_mux) != 0;
+		uint8_t bg_pixel = (pixelMs << 1) | pixelLs;
+
+		uint8_t palLs = (shiftRegAttributeLs & bit_mux) != 0;
+		uint8_t palMs = (shiftRegAttributeMs & bit_mux) != 0;
+		uint8_t bg_palette = (palMs << 1) | palLs;
+	}	
+
+	uint32_t bgColor = getColor(bg_palette, bg_pixel);
+	windowPixelColor[(scanline % 240) * 256 + ((cycle - 1) % 256)] = bgColor;
+	updateScreen();
+
+	cycle++;
+	if(cycle >= 341){
+		cycle = 0;
+		scanline++;
+			
+		if(scanline >= 261)
+			scanline = -1;
 	}
 }
 

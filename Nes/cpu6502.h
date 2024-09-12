@@ -27,7 +27,7 @@ public:
 	}
 
 	void connectBus(Bus* b){ bus = b; }
-
+	
 	enum flag{
 		Carry = 0,
 		Zero = 1,
@@ -283,5 +283,6 @@ public:
 
 	uint16_t getModeInstruction(int);
 
+	void clock();
 	void executeInstruction(uint8_t opcode);
 };

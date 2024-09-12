@@ -16,6 +16,9 @@ class PPU2C02{
 	uint8_t patternTable[2][4096];
 	uint8_t nameTable[4][1024];
 
+	uint8_t ppuGenLatch;
+	uint8_t ppudataBuffer;
+
 	struct OAM{
 		uint8_t spriteY;
 		uint8_t spriteTitle;
@@ -65,7 +68,7 @@ public:
 			uint8_t  v: 1;
 		};
 		uint8_t reg;
-	} control;
+	} ppuctrl;
 
 	union PPUMASK{
 		struct{
@@ -79,7 +82,7 @@ public:
 			uint8_t	B:1;
 		};
 		uint8_t reg;
-	} mask;
+	} ppumask;
 
 	union PPUSTATUS{
 		struct{
@@ -89,14 +92,16 @@ public:
 			uint8_t V:1;
 		};
 		uint8_t reg;
-	} status;
+	} ppustatus;
 
 	uint8_t oamaddr;
 	uint8_t oamdata;
 	uint8_t ppuscroll;
+	uint8_t ppuaddr;
 	uint8_t ppudata;
 	uint8_t oamdma;
-	uint8_t ppuaddr;
+	
+	bool nmi = false;
 
 	PPU2C02();
 
@@ -105,11 +110,12 @@ public:
 
 	uint8_t getValue(uint16_t address);
 	void setValue(uint16_t address, uint8_t value);
-
+ 
 	uint8_t read(uint16_t address);
 	void write(uint16_t address, uint8_t value);
 
 	void reset();
 	void loadShiftRegister();
-	void executePPU();
+	void updateShifter();
+	void clock();
 };

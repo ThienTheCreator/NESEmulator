@@ -3,6 +3,7 @@
 #include "window.h"
 
 using namespace std;
+uint32_t windowPixelColor[windowWidth * windowHeight] = {0};
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -33,7 +34,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			BitBlt(hdcMem, 0, 0, w, h, hdc, 0, 0, SRCCOPY);
 			
-			for(int i = 0; i < w *h; i++){
+			for(int i = 0; i < w * h; i++){
 				pvBits[i] = windowPixelColor[i];
 			}
 			BitBlt(hdc, 0, 0, w, h, hdcMem, 0, 0, SRCCOPY);
@@ -54,12 +55,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-void updateScreen(uint32_t arr[windowWidth * windowHeight]){
-	for(int i = 0; i < windowWidth * windowHeight; i++){
-		windowPixelColor[i] = arr[i];
-	}
-	
-	InvalidateRect(wind, NULL, 0);
+void updateScreen(){
+	InvalidateRect( wind, NULL, FALSE );
 }
 
 DWORD WINAPI ep(void* data){
@@ -106,7 +103,6 @@ DWORD WINAPI ep(void* data){
 		DispatchMessage(&msg);
 	}
 	
-
 	return 0;
 }
 
