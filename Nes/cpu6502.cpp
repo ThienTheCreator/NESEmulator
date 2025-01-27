@@ -57,34 +57,22 @@ bool CPU6502::getFlag(uint8_t bit){
 // Load Accumulator
 void CPU6502::lda(uint8_t value){
 	a = value;
-	
-	bool z = a == 0;
-	handleFlag(Zero, z);
-
-	bool n = (a & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Zero, a == 0);
+	handleFlag(Negative, a & 80);
 }
 
 // Load X Register
 void CPU6502::ldx(uint8_t value){
 	x = value;
-
-	bool z = x == 0;
-	handleFlag(Zero, z);
-
-	bool n = (x & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Zero, x == 0);
+	handleFlag(Negative, x & 0x80);
 }
 
 // Load Y Register
 void CPU6502::ldy(uint16_t value){
 	y = value;
-
-	bool z = y == 0;
-	handleFlag(Zero, z);
-
-	bool n = (y & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Zero, y == 0);
+	handleFlag(Negative, y & 0x80);
 }
 
 // Store Accumulator
@@ -110,44 +98,36 @@ void CPU6502::sty(uint16_t address){
 void CPU6502::tax(){
 	x = a;
 
-	bool z = x == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, x == 0);
 
-	bool n = (x & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, x & 0x80);
 }
 
 // Transfer Accumulator to Y
 void CPU6502::tay(){
 	y = a;
 
-	bool z = y == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, y == 0);
 
-	bool n = (y & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, y & 0x80);
 }
 
 // Transfer X to Accumulator
 void CPU6502::txa(){
 	a = x;
 
-	bool z = a == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, a == 0);
 
-	bool n = (a & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, a & 0x80);
 }
 
 // Transfer Y to Accumulator
 void CPU6502::tya(){
 	a = y;
 
-	bool z = a == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, a == 0);
 	
-	bool n = (a & (1 << 7)) != 0; 
-	handleFlag(Negative, n);
+	handleFlag(Negative, a & 0x80);
 }
 
 /*
@@ -158,11 +138,9 @@ void CPU6502::tya(){
 void CPU6502::tsx(){
 	x = s;
 
-	bool z = x == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, x == 0);
 
-	bool n = x & (1 << 7);
-	handleFlag(Negative, n);
+	handleFlag(Negative, x & 0x80);
 }
 
 // Transfer X to Stack Pointer
@@ -178,7 +156,9 @@ void CPU6502::pha(){
 
 // Push Processor Status
 void CPU6502::php(){
+	handleFlag(Break, true);
 	bus->cpuWrite(s | 0x100, p | 0x10);
+	handleFlag(Break, false);
 	s--;
 }
 
@@ -187,17 +167,15 @@ void CPU6502::pla(){
 	s++;
 	a = bus->cpuRead(s | 0x100);
 
-	bool z = a == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, a == 0);
 
-	bool n = (a & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, a & 0x80);
 }
 
 // Pull Processor Status
 void CPU6502::plp(){
 	s++;
-	p = bus->cpuRead(s | 0x100) & 0xEF | 0x20;
+	p = bus->cpuRead(s | 0x100);
 }
 
 /*
@@ -208,44 +186,31 @@ void CPU6502::plp(){
 void CPU6502::andL(uint8_t value){
 	a = a & value;
 
-	bool z = a == 0;
-	handleFlag(Zero, z);
-	bool n = (a & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Zero, a == 0);
+	handleFlag(Negative, a & 0x80);
 }
 
 // Exclusive OR
 void CPU6502::eor(uint8_t value){
 	a = a ^ value;
-
-	bool n = (a & (1 << 7)) != 0;
-	handleFlag(Negative, n);
-	
-	bool z = a == 0;
-	handleFlag(Zero, z);
+	handleFlag(Negative, a & 0x80);
+	handleFlag(Zero, a == 0);
 }
 
 // Logical Inclusive OR
 void CPU6502::ora(uint8_t value){
 	a = a | value;
-
-	bool c = a == 0;
-	handleFlag(Carry, a == 0);
-
-	bool n = (a & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Zero, a == 0);
+	handleFlag(Negative, a & 0x80);
 }
 
 // bit test
 void CPU6502::bit(uint8_t value){
-	bool n = (value & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, value & 0x80);
 
-	bool v = (value & (1 << 6)) != 0;
-	handleFlag(Overflow, v);
+	handleFlag(Overflow, value & 0x40);
 
-	bool z = (a & value) == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, (a & value) == 0);
 }
 
 /*
@@ -259,16 +224,15 @@ void CPU6502::adc(uint8_t value){
 
 	bool carryIn = getFlag(Carry);
 
-	bool carryOut = a + value + carryIn > 0xFF;
+	bool carryOut = (a + value + carryIn) > 0xFF;
 	a = a + value + carryIn;
 	handleFlag(Carry, carryOut);
 
 	handleFlag(Zero, a == 0);
 
-	bool n = (a & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, a & 0x80);
 
-	bool signResult = (a & (1 << 7)) != 0;
+	bool signResult = (a & 0x80) != 0;
 	bool v = (a7 == m7) && (a7 ^ signResult);
 	handleFlag(Overflow, v);
 }
@@ -287,10 +251,9 @@ void CPU6502::sbc(uint8_t value){
 
 	handleFlag(Zero, a == 0);
 
-	bool n = (a & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, a & 0x80);
 
-	bool signResult = (a & (1 << 7)) != 0;
+	bool signResult = (a & 0x80) != 0;
 	bool v = (a7 ^ m7) && (a7 ^ signResult);
 	handleFlag(Overflow, v);
 }
@@ -299,42 +262,33 @@ void CPU6502::sbc(uint8_t value){
 void CPU6502::cmp(uint8_t value){
 	uint8_t cmpValue = a - value;
 
-	bool c = a >= value;
-	handleFlag(Carry, c);
+	handleFlag(Carry, a >= value);
 
-	bool z = a == value;
-	handleFlag(Zero, z);
+	handleFlag(Zero, a == value);
 
-	bool n = (cmpValue & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, cmpValue & 0x80);
 }
 
 // Compare X Register
 void CPU6502::cpx(uint8_t value){
-	uint8_t result = x - value;
+	uint8_t cmpValue = x - value;
 
-	bool c = x >= value;
-	handleFlag(Carry, c);
+	handleFlag(Carry, x >= value);
 
-	bool z = x == value;
-	handleFlag(Zero, z);
+	handleFlag(Zero, x == value);
 
-	bool n = (result & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, cmpValue & 0x80);
 }
 
 // Compare Y Register
 void CPU6502::cpy(uint8_t value){
-	uint8_t result = y - value;
+	uint8_t cmpValue = y - value;
 
-	bool c = y >= value;
-	handleFlag(Carry, c);
+	handleFlag(Carry, y >= value);
 
-	bool z = y == value;
-	handleFlag(Zero, z);
+	handleFlag(Zero, y == value);
 
-	bool n = (result & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, cmpValue & 0x80);
 }
 
 /*
@@ -348,34 +302,28 @@ void CPU6502::inc(uint16_t address){
 
 	bus->cpuWrite(address, value);
 
-	bool n = (value & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, value & 0x80);
 
-	bool z = value == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, value == 0);
 }
 
 // Increment X Register
 void CPU6502::inx(){
-	x = x + 1;
+	x++;
 
-	bool n = (x & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, x & 0x80);
 
-	bool z = x == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, x == 0);
 
 }
 
 // Increment Y Register
 void CPU6502::iny(){
-	y = y + 1;
+	y++;
 
-	bool n = (y & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, y & 0x80);
 
-	bool z = y == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, y == 0);
 }
 
 // Decrement Memory
@@ -385,33 +333,27 @@ void CPU6502::dec(uint16_t address){
 
 	bus->cpuWrite(address, value);
 
-	bool n = (value & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, value & 0x80);
 
-	bool z = value == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, value == 0);
 }
 
 // Decrement X Register
 void CPU6502::dex(){
-	x = x - 1;
+	x--;
 
-	bool n = (x & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, x & 0x80);
 
-	bool z = x == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, x == 0);
 }
 
 // Decrement Y Register
 void CPU6502::dey(){
-	y = y - 1;
+	y--;
 
-	bool n = (y & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, y & 0x80);
 
-	bool z = y == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, y == 0);
 }
 
 /*
@@ -427,16 +369,13 @@ void CPU6502::asl(uint16_t address, bool isAccumulatorMode){
 		temp = bus->cpuRead(address);
 	}
 
-	uint8_t c = temp & (1 << 7);
+	uint8_t c = temp & 0x80;
 	handleFlag(Carry, c);
 
-	temp = temp << 1;
+	temp <<= 1;
 
-	bool z = a == 0;
-	handleFlag(Zero, z);
-
-	bool n = (temp & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Zero, temp == 0);
+	handleFlag(Negative, temp & 0x80);
 
 	if(isAccumulatorMode){
 		a = temp;	
@@ -459,11 +398,9 @@ void CPU6502::lsr(uint16_t address, bool isAccumulatorMode){
 	
 	temp = temp >> 1;
 
-	bool z = temp == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, temp == 0);
 
-	bool v = temp & (1 << 7);
-	handleFlag(Overflow, v);
+	handleFlag(Negative, temp & 0x80);
 
 	if(isAccumulatorMode){ 
 		a = temp;
@@ -481,7 +418,7 @@ void CPU6502::rol(uint16_t address, bool isAccumulatorMode){
 		temp = bus->cpuRead(address);
 	}
 
-	bool bitSeven = temp & (1 << 7);
+	bool bitSeven = temp & 0x80;
 
 	temp = temp << 1;
 
@@ -490,11 +427,9 @@ void CPU6502::rol(uint16_t address, bool isAccumulatorMode){
 
 	handleFlag(Carry, bitSeven);
 
-	bool z = a == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, temp == 0);
 
-	bool n = (temp & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, temp & 0x80);
 
 	if(isAccumulatorMode){ 
 		a = temp;
@@ -521,11 +456,9 @@ void CPU6502::ror(uint16_t address, bool isAccumulatorMode){
 
 	handleFlag(Carry, bitZero);
 
-	bool z = a == 0;
-	handleFlag(Zero, z);
+	handleFlag(Zero, temp == 0);
 
-	bool n = (temp & (1 << 7)) != 0;
-	handleFlag(Negative, n);
+	handleFlag(Negative, temp & 0x80);
 
 	if(isAccumulatorMode){ 
 		a = temp;
@@ -540,16 +473,19 @@ void CPU6502::ror(uint16_t address, bool isAccumulatorMode){
 
 // Jump
 void CPU6502::jmp(uint16_t address){
-	pc = address - 1;
+	pc = address;
 }
 
 // Jump to Subroutine
 void CPU6502::jsr(uint16_t address){
+	pc--;
+
 	bus->cpuWrite(s | 0x100, pc >> 8);
 	s--;
 	bus->cpuWrite(s | 0x100, pc);
 	s--;
-	pc = address - 1;
+
+	pc = address;
 }
 
 // Return from Subroutine
@@ -558,6 +494,7 @@ void CPU6502::rts(){
 	pc = bus->cpuRead(s | 0x100);
 	s++;
 	pc |= bus->cpuRead(s | 0x100) << 8;
+	pc++;
 }
 
 /*
@@ -569,7 +506,13 @@ void CPU6502::bcc(int8_t displacement){ // TODO
 	bool carryFlag = getFlag(Carry);
 	
 	if(!carryFlag){
-		pc += displacement;
+		waitCycle++;
+		uint16_t address = pc + displacement;
+
+		if((pc & 0xFF00) != (address & 0xFF00))
+			waitCycle++;
+
+		pc = address;
 	}
 }
 
@@ -578,7 +521,13 @@ void CPU6502::bcs(int8_t displacement){
 	bool carryFlag = getFlag(Carry);
 	
 	if(carryFlag){
-		pc += displacement;	
+		waitCycle++;
+		uint16_t address = pc + displacement;
+
+		if((pc & 0xFF00) != (address & 0xFF00))
+			waitCycle++;
+
+		pc = address;	
 	}
 }
 
@@ -587,7 +536,13 @@ void CPU6502::beq(int8_t displacement){ // TODO
 	bool zeroFlag = getFlag(Zero);
 	
 	if(zeroFlag){
-		pc += displacement;
+		waitCycle++;
+		uint16_t address = pc + displacement;
+
+		if((pc & 0xFF00) != (address & 0xFF00))
+			waitCycle++;
+
+		pc = address;	
 	}
 }
 
@@ -597,7 +552,14 @@ void CPU6502::bmi(int8_t displacement){
 	bool negativeFlag = getFlag(Negative);
 	
 	if(negativeFlag){
-		pc += displacement;
+		waitCycle++;
+		
+		uint16_t address = pc + displacement;
+
+		if((pc & 0xFF00) != (address & 0xFF00))
+			waitCycle++;
+
+		pc = address;	
 	}
 }
 
@@ -606,7 +568,14 @@ void CPU6502::bne(int8_t displacement){
 	bool zeroFlag = getFlag(Zero);
 	
 	if(!zeroFlag){
-		pc += displacement;
+		waitCycle++;
+		
+		uint16_t address = pc + displacement;
+
+		if((pc & 0xFF00) != (address & 0xFF00))
+			waitCycle++;
+
+		pc = address;	
 	}
 }
 
@@ -615,7 +584,14 @@ void CPU6502::bpl(int8_t displacement){
 	bool negativeFlag = getFlag(Negative);
 	
 	if(!negativeFlag){
-		pc += displacement;
+		waitCycle++;
+		
+		uint16_t address = pc + displacement;
+
+		if((pc & 0xFF00) != (address & 0xFF00))
+			waitCycle++;
+
+		pc = address;	
 	}
 }
 
@@ -623,8 +599,15 @@ void CPU6502::bpl(int8_t displacement){
 void CPU6502::bvc(int8_t displacement){
 	bool overflowFlag = getFlag(Overflow);
 	
-	if(!overflowFlag){
-		pc += displacement;
+	if(!getFlag(Overflow)){
+		waitCycle++;
+		
+		uint16_t address = pc + displacement;
+
+		if((pc & 0xFF00) != (address & 0xFF00))
+			waitCycle++;
+
+		pc = address;	
 	}
 }
 
@@ -633,7 +616,14 @@ void CPU6502::bvs(int8_t displacement){
 	bool overflowFlag = getFlag(Overflow);
 	
 	if(overflowFlag){
-		pc += displacement;
+		waitCycle++;
+		
+		uint16_t address = pc + displacement;
+
+		if((pc & 0xFF00) != (address & 0xFF00))
+			waitCycle++;
+
+		pc = address;	
 	}
 }
 
@@ -683,19 +673,20 @@ void CPU6502::sei(){
 
 // Force an Interrupt
 void CPU6502::brk(){
-	bus->cpuWrite(s | 0x100, pc);
-	s--;
+	pc++;
+
+	handleFlag(Interrupt, true);
 	bus->cpuWrite(s | 0x100, pc >> 8);
 	s--;
+	bus->cpuWrite(s | 0x100, pc);
+	s--;
+	
+	handleFlag(Break, true);
 	bus->cpuWrite(s | 0x100, p);
 	s--;
-
-	uint16_t temp = bus->cpuRead(0xFFFE);
-	temp = temp | bus->cpuRead(0xFFFF) << 8;
-
-	pc = temp;
-
-	handleFlag(Break, true);
+	handleFlag(Break, false);
+	
+	pc = bus->cpuRead(0xFFFE) | bus->cpuRead(0xFFFF) << 8;
 }
 
 // No Operation
@@ -735,10 +726,21 @@ void CPU6502::nmi(){
 	temp = temp | bus->cpuRead(0xFFFB) << 8;
 
 	pc = temp;
+
+	waitCycle = 8;
 }
 
 void CPU6502::reset(){
-	setFlag(Interrupt);
+
+	pc = bus->cpuRead(0xFFFC) | (bus->cpuRead(0xFFFD) << 8);
+
+	a = 0;
+	x = 0;
+	y = 0;
+	s = 0xFD;
+	p = 0x20;
+
+	waitCycle = 8;
 }
 
 

@@ -275,22 +275,26 @@ void PPU2C02::clock(){
 		if(scanline == 0 && cycle == 0)
 			cycle = 1;
 
-		if((2 <= cycle && cycle <= 258) || (321 <= cycle && cycle <= 338)){
+		if((2 <= cycle && cycle < 258) || (321 <= cycle && cycle < 338)){
 			updateShifter();
 
 			if((cycle - 1) % 8 == 0){
 				loadShiftRegister();
 				nextTileId = getValue(0x2000 | (v.reg & 0xFFF));
 			}
+			
 			if((cycle - 1) % 8 == 2){
 				nextTileAttribute = getValue(0x23C0 | (v.reg & 0x0C00) | ((v.reg >> 4) & 0x38) | ((v.reg >> 2) & 0x7));
 			}
+			
 			if((cycle - 1) % 8 == 4){
 				nextTileBgLs = getValue(ppuctrl.s << 12 | nextTileId << 4 | v.fineY);
 			}
+			
 			if((cycle - 1) % 8 == 6){
 				nextTileBgMs = getValue(ppuctrl.s << 12 | nextTileId << 4 | (v.fineY + 8));
 			}
+
 			if((cycle - 1) % 8 == 7){
 				if((v.reg & 0x001F) == 31){
 					v.reg &= ~0x001F;
@@ -328,17 +332,24 @@ void PPU2C02::clock(){
 		if(cycle == 338 || cycle == 340){
 			nextTileId = read(0x2000 | (v.reg & 0xFFF));
 		}
+
+		if(scanline == -1 && cycle >= 280 && cycle < 305){
+			
+		}
 	}
 
 	if(241 <= scanline && scanline <= 260){
-		ppustatus.V = true;
+		if(scanline == 241 && cycle == 1){
+			ppustatus.V = true;
 
-		if(ppuctrl.v)
-			nmi = true;
+			if(ppuctrl.v)
+				nmi = true;
+		}
 	}
 
 	uint8_t bg_pixel = 0;
 	uint8_t bg_palette = 0;
+
 	if(ppumask.b){
 		uint16_t bit_mux = 0x8000 >> x;
 
@@ -351,9 +362,11 @@ void PPU2C02::clock(){
 		uint8_t bg_palette = (palMs << 1) | palLs;
 	}	
 
-	uint32_t bgColor = getColor(bg_palette, bg_pixel);
-	windowPixelColor[(scanline % 240) * 256 + ((cycle - 1) % 256)] = bgColor;
-	updateScreen();
+	if(0 <= scanline && scanline <= 240 && 0 <= cycle && cycle <= 256){
+		uint32_t bgColor = getColor(bg_palette, bg_pixel);
+		windowPixelColor[(scanline % 240) * 256 + ((cycle-1) % 256)] = bgColor;
+		updateScreen();
+	}
 
 	cycle++;
 	if(cycle >= 341){
@@ -364,18 +377,3 @@ void PPU2C02::clock(){
 			scanline = -1;
 	}
 }
-
-/*
-PPU ppu_2C02;
-
-int main() {
-	HANDLE thread = CreateThread(NULL, 0, ep, NULL, 0, NULL);
-	
-	for(int i = 0; i < 255; i++){
-		getidle();
-		Sleep(100);
-	}
-
-	return 0;
-}
-*/

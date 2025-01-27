@@ -16,7 +16,7 @@ void Bus::loadPpuRom(){
 };
 
 void Bus::loadCartridge(){
-	std::ifstream myfile("donkey kong.nes");
+	std::ifstream myfile("nestest.nes");
 	char c;
 	for(int i = 0; i < 16; i++){
 		myfile.get(c);
@@ -34,11 +34,17 @@ void Bus::loadCartridge(){
 
 uint8_t Bus::cpuRead(uint16_t address){
 	if(0 <= address && address <= 0x1FFF){
-		return cpuRam[address % 0x800];
+		return cpuRam[address & 0x7FF];
 	}
 	
 	if(0x2000 <= address && address <= 0x3FFF){
-		return ppu.read(0x2000 | (address % 0x8));
+		return ppu.read(0x2000 | (address & 0x7));
+	}
+
+	if(address == 0x4016 || address == 0x4017){
+		uint8_t data = (controllerState[address & 0x1] & 0x80) > 0;
+		controllerState[address & 0x1] <<= 1;
+		return data;
 	}
 
 	if( 0x8000 <= address && address <= 0xBFFF){
@@ -49,20 +55,25 @@ uint8_t Bus::cpuRead(uint16_t address){
 		return cartridge[address - 0xC000];		
 	}
 
-	return 0xFF;
+	return 0x0;
 };
 
 void Bus::cpuWrite(uint16_t address, uint8_t value){
 	if( 0 <= address && address <= 0x1FFF){
-		cpuRam[address % 0x800] = value;
+		cpuRam[address & 0x7FF] = value;
 	}
 
 	if(0x2000 <= address && address <= 0x3FFF){
-		ppu.write(0x2000 | (address % 0x8), value);
+		ppu.write(0x2000 | (address & 0x7), value);
 	}
 
 	if(address == 0x4014){
 		ppu.write(0x4014, value);
+	}
+
+	if(address == 0x4016 || address == 0x4017){
+		// TODO: Fixed value for now
+		controllerState[address & 0x1] = controller[address & 0x1];
 	}
 
 	if( 0x8000 <= address && address <= 0xBFFF){
@@ -74,10 +85,13 @@ void Bus::cpuWrite(uint16_t address, uint8_t value){
 	}
 };
 
+#include <iostream>
+
 void Bus::clock(){
 	uint16_t test = cpuRead(0xfffc);
 	test |= cpuRead(0xfffd) << 8;
 
+	test = 0xc000;
 	cpu.pc = test;
 
 	int temp = 0;
@@ -87,12 +101,16 @@ void Bus::clock(){
 		if(temp % 3 == 0){
 			cpu.clock();
 		}
-	
+
 		if(ppu.nmi){
 			ppu.nmi = false;
 			cpu.nmi();
 		}
 
 		temp++;
+	}
+
+	for(int i = 0; i <= 0xFD; i++){
+		cout << hex << i << " " << (int)cpuRead(i) << endl;
 	}
 }

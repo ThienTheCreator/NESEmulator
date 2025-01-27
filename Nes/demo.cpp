@@ -16,6 +16,7 @@ Bus bus;
 int main() {
 	bus.cpu.connectBus(&bus);
 	bus.loadCartridge();
+	bus.controller[0] = 0x80;
 	bus.clock();
 
 	return 0;
