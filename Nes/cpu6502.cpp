@@ -58,7 +58,7 @@ bool CPU6502::getFlag(uint8_t bit){
 void CPU6502::lda(uint8_t value){
 	a = value;
 	handleFlag(Zero, a == 0);
-	handleFlag(Negative, a & 80);
+	handleFlag(Negative, a & 0x80);
 }
 
 // Load X Register
@@ -664,7 +664,7 @@ void CPU6502::sed(){
 // Set Interrupt Disable
 void CPU6502::sei(){
 	handleFlag(Interrupt, true);
-	waitCycle = 2;
+	waitCycle += 2;
 }
 
 /*
@@ -707,7 +707,23 @@ void CPU6502::rti(){
 }
 
 void CPU6502::irq(){
-	setFlag(Interrupt);
+	if(getFlag(Interrupt) == 0){
+		bus->cpuWrite(0x100 | s, (pc >> 8) & 0xFF);
+		s--;
+		bus->cpuWrite(0x100 | s, pc & 0xFF);
+		s--;
+
+		handleFlag(Break, false);
+		handleFlag(Interrupt, true);
+		bus->cpuWrite(0x100 | s, p);
+		s--;
+
+		uint16_t lo = bus->cpuRead(0xFFFE);
+		uint16_t hi = bus->cpuRead(0xFFFF);
+		pc = (hi << 8) | lo;
+
+		waitCycle += 7;
+	}
 }
 
 void CPU6502::nmi(){
@@ -719,7 +735,7 @@ void CPU6502::nmi(){
 	handleFlag(Interrupt, 1);
 	handleFlag(Break, 0);
 	
-	bus->cpuWrite(s | 0x100, p);
+	bus->cpuWrite(0x100 | s, p);
 	s--;
 
 	uint16_t temp = bus->cpuRead(0xFFFA);
@@ -727,7 +743,7 @@ void CPU6502::nmi(){
 
 	pc = temp;
 
-	waitCycle = 8;
+	waitCycle += 8;
 }
 
 void CPU6502::reset(){
@@ -740,7 +756,7 @@ void CPU6502::reset(){
 	s = 0xFD;
 	p = 0x20;
 
-	waitCycle = 8;
+	waitCycle += 8;
 }
 
 
@@ -749,7 +765,7 @@ uint16_t CPU6502::getModeInstruction(int mode){
 
 	if(mode == Immediate){ // Immediate
 		return bus->cpuRead(pc);
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(mode == ZeroPage){ // Zero Page
@@ -764,20 +780,20 @@ uint16_t CPU6502::getModeInstruction(int mode){
 	if(mode == ZeroPageY){
 		uint8_t address = bus->cpuRead(pc);
 		return (uint8_t)(address + y);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(mode == Relative){
 		uint8_t displacement = bus->cpuRead(pc);
 
 		// TODO: add +1 branch, add +2 new page
-		waitCycle = 2;
+		waitCycle += 2;
 
 		return displacement;
 	}
 
 	if(mode == Absolute){ // Absolute
-		uint16_t address = bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
+		uint16_t address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
 		
 		return address;
 	}
@@ -798,7 +814,7 @@ uint16_t CPU6502::getModeInstruction(int mode){
 		uint8_t temp = bus->cpuRead(pc);
 		uint8_t temp2 = temp + x;
 		uint8_t temp3 = bus->cpuRead(temp2) | (bus->cpuRead(temp2 + 1) << 8);
-		waitCycle = 6;
+		waitCycle += 6;
 		
 		return bus->cpuRead(temp3);
 	}
@@ -816,7 +832,7 @@ uint16_t CPU6502::getModeInstruction(int mode){
 
 void CPU6502::clock(){
 	if(waitCycle <= 0){
-		if(false){ // debug
+		if(true){ // debug
 			cout << uppercase << hex;
 			cout << "PC:" << setw(4) << pc;
 			cout << " A:" << setfill('0') << setw(2) << (int)a;
@@ -850,21 +866,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		lda(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0xB5){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		uint8_t value = bus->cpuRead(address);
 		lda(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xAD){
 		uint16_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		lda(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xBD){
@@ -872,7 +888,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		lda(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xB9){
@@ -880,7 +896,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		lda(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xA1){
@@ -894,7 +910,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		lda(value);
 		// TODO: +1 if page crossed
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0xA2){
@@ -906,7 +922,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		ldx(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0xB6){
@@ -919,7 +935,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		ldx(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xBE){
@@ -927,7 +943,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t value = bus->cpuRead(address);
 		ldx(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xA0){
@@ -939,21 +955,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t address = getModeInstruction(ZeroPage);
 		uint16_t value = bus->cpuRead(address);
 		ldy(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0xB4){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		uint16_t value = bus->cpuRead(address);
 		ldy(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xAC){
 		uint16_t address = getModeInstruction(Absolute);
 		uint16_t value = bus->cpuRead(address);
 		ldy(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xBC){
@@ -961,37 +977,37 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t value = bus->cpuRead(address);
 		ldy(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x85){
 		uint16_t address = getModeInstruction(ZeroPage);
 		sta(address);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x95){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		sta(address);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x8D){
 		uint16_t address = getModeInstruction(Absolute);
 		sta(address);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x9D){
 		uint16_t address = getModeInstruction(AbsoluteX);
 		sta(address);
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x99){
 		uint16_t address = getModeInstruction(AbsoluteY);
 		sta(address);
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x81){
@@ -1002,13 +1018,13 @@ void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0x91){
 		uint16_t address = getModeInstruction(IndexedIndirect);
 		sta(address);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x86){
 		uint16_t address = getModeInstruction(ZeroPage);
 		stx(address);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x96){
@@ -1019,75 +1035,75 @@ void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0x8E){
 		uint16_t address = getModeInstruction(Absolute);
 		stx(address);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x84){
 		uint16_t address = getModeInstruction(ZeroPage);
 		sty(address);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x94){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		sty(address);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x8C){
 		uint16_t address = getModeInstruction(Absolute);
 		sty(address);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xAA){
 		tax();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0xA8){
 		tay();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x8A){
 		txa();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x98){
 		tya();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0xBA){
 		tsx();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x9A){
 		txs();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x48){
 		pha();
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x08){
 		php();
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x68){
 		pla();
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x28){
 		plp();
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x29){
@@ -1099,21 +1115,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t address = getModeInstruction(ZeroPage);
 		int8_t value = bus->cpuRead(address);
 		andL(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x35){
 		uint8_t address = getModeInstruction(ZeroPageX);
 		int8_t value = bus->cpuRead(address);
 		andL(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x2D){
 		uint8_t address = getModeInstruction(Absolute);
 		int8_t value = bus->cpuRead(address);
 		andL(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x3D){
@@ -1121,7 +1137,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		int8_t value = bus->cpuRead(address);
 		andL(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x39){
@@ -1129,7 +1145,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		int8_t value = bus->cpuRead(address);
 		andL(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x21){
@@ -1143,7 +1159,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		int8_t value = bus->cpuRead(address);
 		andL(value);
 		// TODO: +1 if page crossed
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x49){
@@ -1155,21 +1171,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		eor(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x55){
 		uint8_t address = getModeInstruction(ZeroPageX);
 		uint8_t value = bus->cpuRead(address);
 		eor(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x4D){
 		uint8_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		eor(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x5D){
@@ -1177,7 +1193,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		eor(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x59){
@@ -1185,7 +1201,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		eor(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x41){
@@ -1199,7 +1215,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		eor(value);
 		// TODO: +1 if page crossed
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x09){
@@ -1211,21 +1227,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		ora(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x15){
 		uint8_t address = getModeInstruction(ZeroPageX);
 		uint8_t value = bus->cpuRead(address);
 		ora(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x0D){
 		uint8_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		ora(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x1D){
@@ -1233,7 +1249,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		ora(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x19){
@@ -1241,7 +1257,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		ora(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x01){
@@ -1255,21 +1271,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		ora(value);
 		// TODO: +1 if page crossed
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x24){
 		uint8_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		bit(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x2C){
 		uint8_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		bit(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x69){
@@ -1281,21 +1297,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		adc(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x75){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		uint8_t value = bus->cpuRead(address);
 		adc(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x6D){
 		uint16_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		adc(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x7D){
@@ -1303,7 +1319,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		adc(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x79){
@@ -1311,7 +1327,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		adc(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0x61){
@@ -1325,7 +1341,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		adc(value);
 		// TODO: +1 if page crossed
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0xE9){
@@ -1337,21 +1353,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		sbc(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0xF5){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		uint8_t value = bus->cpuRead(address);
 		sbc(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xED){
 		uint16_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		sbc(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xFD){
@@ -1359,7 +1375,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xF9){
@@ -1367,7 +1383,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xE1){
@@ -1381,7 +1397,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		sbc(value);
 		// TODO: +1 if page crossed
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0xC9){
@@ -1393,21 +1409,21 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		cmp(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0xD5){
 		uint8_t address = getModeInstruction(ZeroPageX);
 		uint8_t value = bus->cpuRead(address);
 		cmp(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xCD){
 		uint8_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		cmp(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 	
 	if(opcode == 0xDD){
@@ -1415,7 +1431,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 	
 	if(opcode == 0xD9){
@@ -1423,7 +1439,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 		// TODO: +1 if page crossed
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 	
 	if(opcode == 0xC1){
@@ -1437,7 +1453,7 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint8_t value = bus->cpuRead(address);
 		cmp(value);
 		// TODO: +1 if page crossed
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0xE0){
@@ -1449,14 +1465,14 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		cpx(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0xEC){
 		uint16_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		cpx(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xC0){
@@ -1468,82 +1484,82 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		uint16_t address = getModeInstruction(ZeroPage);
 		uint8_t value = bus->cpuRead(address);
 		cpy(value);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0xCC){
 		uint16_t address = getModeInstruction(Absolute);
 		uint8_t value = bus->cpuRead(address);
 		cpy(value);
-		waitCycle = 4;
+		waitCycle += 4;
 	}
 
 	if(opcode == 0xE6){
 		uint16_t address = getModeInstruction(ZeroPage);
 		inc(address);
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0xF6){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		inc(address);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0xEE){
 		uint16_t address = getModeInstruction(Absolute);
 		inc(address);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0xFE){
 		uint16_t address = getModeInstruction(AbsoluteX);
 		inc(address);
-		waitCycle = 7;
+		waitCycle += 7;
 	}
 
 	if(opcode == 0xE8){
 		inx();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0xC8){
 		iny();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0xC6){
 		uint16_t address = getModeInstruction(ZeroPage);
 		dec(address);
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0xD6){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		dec(address);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0xCE){
 		uint16_t address = getModeInstruction(Absolute);
 		dec(address);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0xDE){
 		uint16_t address = getModeInstruction(AbsoluteX);
 		dec(address);
-		waitCycle = 7;
+		waitCycle += 7;
 	}
 
 	if(opcode == 0xCA){
 		dex();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x88){
 		dey();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x0A){
@@ -1553,25 +1569,25 @@ void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0x06){
 		uint16_t address = getModeInstruction(ZeroPage);
 		asl(address, false);
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x16){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		asl(address, false);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x0E){
 		uint16_t address = getModeInstruction(Absolute);
 		asl(address, false);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x1E){
 		uint16_t address = getModeInstruction(AbsoluteX);
 		asl(address, false);
-		waitCycle = 7;
+		waitCycle += 7;
 	}
 
 	if(opcode == 0x4A){
@@ -1581,25 +1597,25 @@ void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0x46){
 		uint16_t address = getModeInstruction(ZeroPage);
 		lsr(address, false);
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x56){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		lsr(address, false);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x4E){
 		uint16_t address = getModeInstruction(Absolute);
 		lsr(address, false);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x5E){
 		uint16_t address = getModeInstruction(AbsoluteX);
 		lsr(address, false);
-		waitCycle = 7;
+		waitCycle += 7;
 	}
 
 	if(opcode == 0x2A){
@@ -1609,25 +1625,25 @@ void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0x26){
 		uint16_t address = getModeInstruction(ZeroPage);
 		rol(address, false);
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x36){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		rol(address, false);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x2E){
 		uint16_t address = getModeInstruction(Absolute);
 		rol(address, false);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x3E){
 		uint16_t address = getModeInstruction(AbsoluteX);
 		rol(address, false);
-		waitCycle = 7;
+		waitCycle += 7;
 	}
 
 	if(opcode == 0x6A){
@@ -1637,13 +1653,13 @@ void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0x66){
 		uint16_t address = getModeInstruction(ZeroPage);
 		ror(address, false);
-		waitCycle = 5;
+		waitCycle += 5;
 	}
 
 	if(opcode == 0x76){
 		uint16_t address = getModeInstruction(ZeroPageX);
 		ror(address, false);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x6E){
@@ -1654,13 +1670,13 @@ void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0x7E){
 		uint16_t address = getModeInstruction(AbsoluteX);
 		ror(address, false);
-		waitCycle = 7;
+		waitCycle += 7;
 	}
 
 	if(opcode == 0x4C){
 		uint16_t address = getModeInstruction(Absolute);
 		jmp(address);
-		waitCycle = 3;
+		waitCycle += 3;
 	}
 
 	if(opcode == 0x6C){
@@ -1671,12 +1687,12 @@ void CPU6502::executeInstruction(uint8_t opcode){
 	if(opcode == 0x20){
 		uint16_t address = getModeInstruction(Absolute);
 		jsr(address);
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x60){
 		rts();
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	if(opcode == 0x90){
@@ -1721,52 +1737,52 @@ void CPU6502::executeInstruction(uint8_t opcode){
 
 	if(opcode == 0x18){
 		clc();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0xD8){
 		cld();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x58){
 		cli();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0xB8){
 		clv();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x38){
 		sec();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0xF8){
 		sed();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x78){
 		sei();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x00){
 		brk();
-		waitCycle = 7;
+		waitCycle += 7;
 	}
 
 	if(opcode == 0xEA){
 		nop();
-		waitCycle = 2;
+		waitCycle += 2;
 	}
 
 	if(opcode == 0x40){
 		rti();
-		waitCycle = 6;
+		waitCycle += 6;
 	}
 
 	pc++;

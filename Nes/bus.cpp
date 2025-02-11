@@ -16,7 +16,7 @@ void Bus::loadPpuRom(){
 };
 
 void Bus::loadCartridge(){
-	std::ifstream myfile("nestest.nes");
+	std::ifstream myfile("donkey kong.nes");
 	char c;
 	for(int i = 0; i < 16; i++){
 		myfile.get(c);
@@ -91,11 +91,10 @@ void Bus::clock(){
 	uint16_t test = cpuRead(0xfffc);
 	test |= cpuRead(0xfffd) << 8;
 
-	test = 0xc000;
 	cpu.pc = test;
 
 	int temp = 0;
-	while(temp < 16384 * 1000){
+	while(temp < 16384 * 60){
 		ppu.clock();
 		
 		if(temp % 3 == 0){
@@ -110,7 +109,4 @@ void Bus::clock(){
 		temp++;
 	}
 
-	for(int i = 0; i <= 0xFD; i++){
-		cout << hex << i << " " << (int)cpuRead(i) << endl;
-	}
 }
