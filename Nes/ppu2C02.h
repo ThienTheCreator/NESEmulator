@@ -26,7 +26,8 @@ class PPU2C02{
 		struct{
 			uint8_t coarseX :5;
 			uint8_t coarseY :5;
-			uint8_t nametable: 2;
+			uint8_t nametableX: 1;
+			uint8_t nametableY: 1;
 			uint8_t fineY : 3;
 			uint8_t unused: 1;
 		};
@@ -36,10 +37,10 @@ class PPU2C02{
 	uint8_t x: 3;
 	uint8_t w: 1;
 
-	uint8_t nextTileId = 0;
-	uint8_t nextTileAttribute = 0;
-	uint8_t nextTileBgLs = 0;
-	uint8_t nextTileBgMs = 0;
+	uint8_t bgNextTileId = 0;
+	uint8_t bgNextTileAttribute = 0;
+	uint8_t bgNextTileLs = 0;
+	uint8_t bgNextTileMs = 0;
 
 	uint16_t bgShifterPatternLs = 0;
 	uint16_t bgShifterPatternMs = 0;
@@ -52,14 +53,16 @@ class PPU2C02{
 	bool bSpriteZeroHitPossible = false;
 	bool bSpriteZeroBeingRendered = false;
 
-	uint16_t scanline = 0;
-	uint16_t cycle = 0;
+	int16_t scanline = 0;
+	int16_t cycle = 0;
+	bool oddFrame = false;
 
 	HANDLE thread = CreateThread(NULL, 0, ep, NULL, 0, NULL);
 public:
 	union PPUCTRL{
 		struct {
-			uint8_t nn: 2; // nametable x, y
+			uint8_t nametableX: 1; // nametable x
+			uint8_t nametableY: 1; // nametable y 
 			uint8_t  i: 1; // increment mode
 			uint8_t  s: 1; // sprite tile select: unimplemented for 8x8 sprite	
 			uint8_t  b: 1; // background tile select
@@ -72,14 +75,14 @@ public:
 
 	union PPUMASK{
 		struct{
-			uint8_t Greyscale:1;
-			uint8_t m:1;
-			uint8_t M:1;
-			uint8_t bg:1;
-			uint8_t s:1;			
-			uint8_t R:1;
-			uint8_t G:1;
-			uint8_t	B:1;
+			uint8_t Greyscale:1;    // Greyscale
+			uint8_t bgL:1; 			// Bg leftmost
+			uint8_t sL:1; 			// sprite leftmost
+			uint8_t bg:1; 			// Bg rendering
+			uint8_t s:1;			// sprite rendering
+			uint8_t R:1; 			// emphasize red
+			uint8_t G:1; 			// emphasize green
+			uint8_t	B:1; 			// emphasize blue
 		};
 		uint8_t reg;
 	} ppumask;
@@ -101,22 +104,26 @@ public:
 		uint8_t x;
 	} oam[64];
 
+	PPU2C02();
+
+	uint8_t* cart;
+	void connectCartridge(uint8_t* cartridge);
+	void reset();
+
 	spriteObject spriteScanline[8];
 
 	uint8_t spriteCount; 
 
 	uint8_t* pOAM = (uint8_t*)oam;
 	
-	uint8_t oamAddr;
-	uint8_t oamData;
-	uint8_t ppuScroll;
-	uint8_t ppuAddr;
-	uint8_t ppuData;
-	uint8_t oamDma;
+	uint8_t oamAddr = 0;
+	uint8_t oamData = 0;
+	uint8_t ppuScroll = 0;
+	uint8_t ppuAddr = 0;
+	uint8_t ppuData = 0;
+	uint8_t oamDma = 0;
 	
 	bool nmi = false;
-
-	PPU2C02();
 
 	void setupColor();
 	uint32_t getColor(uint8_t palette, uint8_t pixel);
@@ -127,8 +134,5 @@ public:
 	uint8_t read(uint16_t address);
 	void write(uint16_t address, uint8_t value);
 
-	void reset();
-	void loadBgShifter();
-	void updateShifter();
 	void clock();
 };

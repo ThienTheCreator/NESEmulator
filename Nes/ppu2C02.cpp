@@ -79,7 +79,33 @@ PPU2C02::PPU2C02(){
 	setupColor();
 }
 
+void PPU2C02::connectCartridge(uint8_t* cartridge){
+	cart = cartridge;
+}
+
+void PPU2C02::reset(){
+	x = 0;
+	w = 0;
+	ppuDataBuffer = 0;
+	scanline = 0;
+	cycle = 0;
+	bgNextTileId = 0;
+	bgNextTileAttribute = 0;
+	bgNextTileLs = 0;
+	bgNextTileMs = 0;
+	bgShifterPatternLs = 0;
+	bgShifterPatternMs = 0;
+	bgShifterAttributeLs = 0;
+	bgShifterAttributeMs = 0;
+	ppustatus.reg = 0;
+	ppumask.reg = 0;
+	ppuctrl.reg = 0;
+	v.reg = 0;
+	t.reg = 0;
+}
+
 uint8_t PPU2C02::getValue(uint16_t address){
+	address &= 0x3FFF;
 
 	if(0x000 <= address && address <= 0xFFF){
 		return patternTable[0][address];
@@ -89,7 +115,8 @@ uint8_t PPU2C02::getValue(uint16_t address){
 
 	}else if(0x2000 <= address && address <= 0x3EFF){
 		address &= 0x0FFF;
-		
+	
+		// Horizontal Mirror
 		if (0x000 <= address && address <= 0x3FF){
 			return nameTable[0][address & 0x3FF];
 
@@ -123,24 +150,30 @@ uint8_t PPU2C02::getValue(uint16_t address){
 }
 
 void PPU2C02::setValue(uint16_t address, uint8_t value){
-	
+	address &= 0x3FFF;
+
 	if(0x000 <= address && address <= 0xFFF){
 		patternTable[0][address] = value;
 
 	}else if(0x1000 <= address && address <= 0x1FFF){
 		patternTable[1][address & 0xFFF] = value;
 
-	}else if(0x2000 <= address && address <= 0x23FF){ // horizontal mirroring
-		nameTable[0][address & 0x3FF] = value;
+	}else if(0x2000 <= address && address <= 0x3EFF){
+		address &= 0xFFF;
 
-	}else if(0x2400 <= address && address <= 0x27FF){
-		nameTable[0][address & 0x3FF] = value;
+		// horizontal mirroring
+		if(0x000 <= address && address <= 0x3FF){
+			nameTable[0][address & 0x3FF] = value;
 
-	}else if(0x2800 <= address && address <= 0x2BFF){
-		nameTable[1][address & 0x3FF] = value;
+		}else if(0x400 <= address && address <= 0x7FF){
+			nameTable[0][address & 0x3FF] = value;
 
-	}else if(0x2C00 <= address && address <= 0x2FFF){
-		nameTable[1][address & 0x3FF] = value;
+		}else if(0x800 <= address && address <= 0xBFF){
+			nameTable[1][address & 0x3FF] = value;
+
+		}else if(0xC00 <= address && address <= 0xFFF){
+			nameTable[1][address & 0x3FF] = value;
+		}
 	} else if(0x3F00 <= address && address <= 0x3FFF){
 		address &= 0x1F;
 		if(address == 0x10) 
@@ -163,7 +196,7 @@ void PPU2C02::setValue(uint16_t address, uint8_t value){
 // communication used by cpu
 uint8_t PPU2C02::read(uint16_t address){
 	if(address == 0x2002){
-		ppuGenLatch = (ppustatus.reg & 0xE0) | (ppuGenLatch & 0x1F);
+		ppuGenLatch = (ppustatus.reg & 0xE0) | (ppuDataBuffer & 0x1F);
 		ppustatus.V = 0;
 		w = 0;
 	}
@@ -187,14 +220,10 @@ uint8_t PPU2C02::read(uint16_t address){
 
 // communication used by cpu
 void PPU2C02::write(uint16_t address, uint8_t value){
-	if(address == 0x4014){
-		// TODO
-		return;
-	}
-
 	if(address == 0x2000){
 		ppuctrl.reg = value;
-		t.nametable = ppuctrl.nn;
+		t.nametableX = ppuctrl.nametableX;
+		t.nametableY = ppuctrl.nametableY;
 	} 
 
 	if(address == 0x2001){
@@ -211,12 +240,12 @@ void PPU2C02::write(uint16_t address, uint8_t value){
 
 	if(address == 0x2005){
 		if(w == 0){ // first write
-			x = value & 0x7;
-			t.coarseX = ppuScroll >> 3;
+			x = value & 0x07;
+			t.coarseX = value >> 3;
 			w = 1;
 		} else {    // second write
 			t.fineY = value & 0x7;
-			t.coarseY = ppuScroll >> 3;
+			t.coarseY = value >> 3;
 			w = 0;
 		}
 	}
@@ -236,46 +265,6 @@ void PPU2C02::write(uint16_t address, uint8_t value){
 		setValue(v.reg, value);
 		v.reg += (ppuctrl.i ? 32 : 1);
 	}
-
-	ppuGenLatch = value;
-}
-
-void PPU2C02::reset(){
-	cycle = 0;
-
-	oamAddr = 0;
-	ppuScroll = 0;
-	ppuAddr = 0;
-	ppuData = 0;
-}
-
-void PPU2C02::loadBgShifter(){
-	bgShifterPatternLs = (bgShifterPatternLs & 0xFF00) | nextTileBgLs;
-	bgShifterPatternMs = (bgShifterPatternMs & 0xFF00) | nextTileBgMs;
-
-	bgShifterAttributeLs = (bgShifterAttributeLs & 0xFF00) | ((nextTileAttribute & 0b01) ? 0xFF : 0x00);
-	bgShifterAttributeMs = (bgShifterAttributeMs & 0xFF00) | ((nextTileAttribute & 0b10) ? 0xFF : 0x00);
-}
-
-void PPU2C02::updateShifter(){
-	if(ppumask.bg){
-		bgShifterPatternLs <<= 1;
-		bgShifterPatternMs <<= 1;
-
-		bgShifterAttributeLs <<= 1;
-		bgShifterAttributeMs <<= 1;
-	}
-
-	if(ppumask.s && 1 <= cycle && cycle < 258){
-		for(int i = 0; i < spriteCount; ++i){
-			if(spriteScanline[i].x > 0){
-				spriteScanline[i].x--;
-			} else {
-				spriteShifterPatternLs[i] <<= 1;
-				spriteShifterPatternMs[i] <<= 1;
-			}
-		}
-	}
 }
 
 uint32_t PPU2C02::getColor(uint8_t palette, uint8_t pixel){
@@ -283,6 +272,80 @@ uint32_t PPU2C02::getColor(uint8_t palette, uint8_t pixel){
 };
 
 void PPU2C02::clock(){
+	auto incrementScrollX = [&](){
+		if(ppumask.bg || ppumask.s){
+			if(v.coarseX == 31){
+				v.coarseX = 0;
+				v.nametableX = ~v.nametableX;
+			} else {
+				v.coarseX++;
+			}
+		}
+	};
+	
+	auto incrementScrollY = [&](){
+		if(ppumask.bg || ppumask.s){
+			if(v.fineY < 7){
+				v.fineY++;
+			} else {
+				v.fineY = 0;
+			
+				if(v.coarseY == 29){
+					v.coarseY = 0;
+					v.nametableY = ~v.nametableY; 
+				} else if(v.coarseY == 31){
+					v.coarseY = 0;
+				} else {
+					v.coarseY++;
+				}
+			}
+		}
+	};
+	
+	auto transferAddressX = [&](){
+		if(ppumask.bg || ppumask.s){
+			v.nametableX = t.nametableX;
+			v.coarseX = t.coarseX;
+		}
+	};
+	
+	auto transferAddressY = [&](){
+		if(ppumask.bg || ppumask.s){
+			v.fineY = t.fineY;
+			v.nametableY = t.nametableY;
+			v.coarseY = t.coarseY;
+		}
+	};
+	
+	auto loadBgShifters = [&](){
+		bgShifterPatternLs = (bgShifterPatternLs & 0xFF00) | bgNextTileLs;
+		bgShifterPatternMs = (bgShifterPatternMs & 0xFF00) | bgNextTileMs;
+
+		bgShifterAttributeLs = (bgShifterAttributeLs & 0xFF00) | ((bgNextTileAttribute & 0b01) ? 0xFF : 0x00);
+		bgShifterAttributeMs = (bgShifterAttributeMs & 0xFF00) | ((bgNextTileAttribute & 0b10) ? 0xFF : 0x00);
+	};
+	
+	auto updateShifters = [&](){
+		if(ppumask.bg){
+			bgShifterPatternLs <<= 1;
+			bgShifterPatternMs <<= 1;
+
+			bgShifterAttributeLs <<= 1;
+			bgShifterAttributeMs <<= 1;
+		}
+
+		if(ppumask.s && 1 <= cycle && cycle < 258){
+			for(int i = 0; i < spriteCount; ++i){
+				if(spriteScanline[i].x > 0){
+					spriteScanline[i].x--;
+				} else {
+					spriteShifterPatternLs[i] <<= 1;
+					spriteShifterPatternMs[i] <<= 1;
+				}
+			}
+		}
+	};
+
 	if(-1 <= scanline && scanline <= 239){
 		if(scanline == -1 && cycle == 1){
 			ppustatus.V = 0;
@@ -295,74 +358,60 @@ void PPU2C02::clock(){
 			}	
 		}
 
-		if(scanline == 0 && cycle == 0)
+		if(scanline == 0 && cycle == 0 && oddFrame && (ppumask.bg | ppumask.s))
 			cycle = 1;
 
 		if((2 <= cycle && cycle < 258) || (321 <= cycle && cycle < 338)){
-			updateShifter();
+			updateShifters();
 
 			if((cycle - 1) % 8 == 0){
-				loadBgShifter();
-				nextTileId = getValue(0x2000 | (v.reg & 0xFFF));
+				loadBgShifters();
+				bgNextTileId = getValue(0x2000 | (v.reg & 0xFFF));
 			}
 			
 			if((cycle - 1) % 8 == 2){
-				nextTileAttribute = getValue(0x23C0 | (v.reg & 0x0C00) | ((v.reg >> 4) & 0x38) | ((v.reg >> 2) & 0x7));
+				bgNextTileAttribute = getValue(0x23C0 | (v.nametableY << 11) 
+													| (v.nametableX << 10) 
+													| ((v.coarseY >> 2) << 3)
+													| (v.coarseX >> 2));
+
+				if(v.coarseY & 0x2) bgNextTileAttribute >>= 4;
+				if(v.coarseX & 0x2) bgNextTileAttribute >>= 2;
+				bgNextTileAttribute &= 0x03;
 			}
 			
 			if((cycle - 1) % 8 == 4){
-				nextTileBgLs = getValue(ppuctrl.s << 12 | nextTileId << 4 | v.fineY);
+				bgNextTileLs = getValue((ppuctrl.b << 12) 
+										+ ((uint16_t)bgNextTileId << 4)
+										+ v.fineY);
 			}
 			
 			if((cycle - 1) % 8 == 6){
-				nextTileBgMs = getValue(ppuctrl.s << 12 | nextTileId << 4 | (v.fineY + 8));
+				bgNextTileMs = getValue((ppuctrl.b << 12)
+										+ ((uint16_t)bgNextTileId << 4) 
+										+ v.fineY + 8);
 			}
 
 			if((cycle - 1) % 8 == 7){
-				if((v.reg & 0x001F) == 31){
-					v.reg &= ~0x001F;
-					v.reg ^= 0x0400;
-				} else {
-					v.reg += 1;
-				}
+				incrementScrollX();
 			}
 		}
 
 		if(cycle == 256){
-			if((v.reg & 0x7000) != 0x7000){
-				v.reg += 0x1000;
-			} else {
-				v.reg &= ~0x7000;
-				uint16_t y = (v.reg & 0x03E0) >> 5;
-				if (y == 29){
-					y = 0;
-					v.reg ^= 0x0800;
-				} else if(y == 31){
-					y = 0;
-				} else {
-					y += 1;
-				}
-				v.reg = (v.reg & ~0x03E0) | (y << 5);
-			}
+			incrementScrollY();
 		}
 
 		if(cycle == 257){
-			loadBgShifter();
-			if(ppumask.bg || ppumask.s){
-				v.reg = (v.reg & ~0x41F) | (t.reg & 0x41F);
-			}
+			loadBgShifters();
+			transferAddressX();
 		}
 
 		if(cycle == 338 || cycle == 340){
-			nextTileId = getValue(0x2000 | (v.reg & 0xFFF));
+			bgNextTileId = getValue(0x2000 | (v.reg & 0xFFF));
 		}
 
-		if(scanline == -1 && cycle >= 280 && cycle < 305){
-			if(ppumask.bg || ppumask.s){
-				v.fineY = t.fineY;
-				v.nametable = v.nametable & (t.nametable | 1);
-				v.coarseY = t.coarseY;
-			}
+		if(scanline == -1 && 280 <= cycle && cycle < 305){
+			transferAddressY();
 		}
 
 		if(cycle == 257 && scanline >= 0){
@@ -381,21 +430,21 @@ void PPU2C02::clock(){
 			while(nOAMEntry < 64 && spriteCount < 9){
 				int16_t diff = ((int16_t) scanline - (int16_t)oam[nOAMEntry].y);
 
-				if(diff >= 0 && diff < (ppuctrl.h ? 16 : 8)){
-					if(spriteCount < 0){
+				if(diff >= 0 && diff < (ppuctrl.h ? 16 : 8) && spriteCount < 8){
+					if(spriteCount < 8){
 						if(nOAMEntry == 0){
 							bSpriteZeroHitPossible = true;
 						}
 
 						memcpy(&spriteScanline[spriteCount], &oam[nOAMEntry], sizeof(spriteObject));
-						spriteCount++;
 					}
+					spriteCount++;
 				}
 
 				nOAMEntry++;
 			}
 
-			ppustatus.O = (spriteCount > 8);
+			ppustatus.O = (spriteCount >= 8);
 		}
 		
 		if(cycle == 340){
@@ -473,15 +522,17 @@ void PPU2C02::clock(){
 	uint8_t bgPalette = 0;
 
 	if(ppumask.bg){
-		uint16_t bit_mux = 0x8000 >> x;
+		if(ppumask.bgL || (cycle >= 9)){
+			uint16_t bit_mux = 0x8000 >> x;
 
-		uint8_t pixelLs = (bgShifterPatternLs & bit_mux) != 0;
-		uint8_t pixelMs = (bgShifterPatternMs & bit_mux) != 0;
-		uint8_t bgPixel = (pixelMs << 1) | pixelLs;
+			uint8_t pixelLs = (bgShifterPatternLs & bit_mux) != 0;
+			uint8_t pixelMs = (bgShifterPatternMs & bit_mux) != 0;
+			uint8_t bgPixel = (pixelMs << 1) | pixelLs;
 
-		uint8_t palLs = (bgShifterAttributeLs & bit_mux) != 0;
-		uint8_t palMs = (bgShifterAttributeMs & bit_mux) != 0;
-		uint8_t bgPalette = (palMs << 1) | palLs;
+			uint8_t palLs = (bgShifterAttributeLs & bit_mux) != 0;
+			uint8_t palMs = (bgShifterAttributeMs & bit_mux) != 0;
+			uint8_t bgPalette = (palMs << 1) | palLs;
+		}
 	}
 
 	uint8_t fgPixel = 0;
@@ -489,21 +540,24 @@ void PPU2C02::clock(){
 	uint8_t fgPriority = 0;
 
 	if(ppumask.s){
-		for(int i = 0; i < spriteCount; ++i){
-			if(spriteScanline[i].x == 0){
-				uint8_t fgPixelLs = (spriteShifterPatternLs[i] & 0x80) > 0;
-				uint8_t fgPixelMs = (spriteShifterPatternMs[i] & 0x80) > 0;
-				fgPixel = (fgPixelMs << 1) | fgPixelLs;
+		if(ppumask.sL || cycle >= 9){
+			bSpriteZeroBeingRendered = false;
+			for(int i = 0; i < spriteCount; ++i){
+				if(spriteScanline[i].x == 0){
+					uint8_t fgPixelLs = (spriteShifterPatternLs[i] & 0x80) > 0;
+					uint8_t fgPixelMs = (spriteShifterPatternMs[i] & 0x80) > 0;
+					fgPixel = (fgPixelMs << 1) | fgPixelLs;
 
-				fgPalette = (spriteScanline[i].attribute & 0x03) + 0x04;
-				fgPriority = (spriteScanline[i].attribute & 0x20) == 0;
+					fgPalette = (spriteScanline[i].attribute & 0x03) + 0x04;
+					fgPriority = (spriteScanline[i].attribute & 0x20) == 0;
 			
-				if(fgPixel != 0){
-					if(i == 0){
-						bSpriteZeroBeingRendered = true;
-					}
+					if(fgPixel != 0){
+						if(i == 0){
+							bSpriteZeroBeingRendered = true;
+						}
 
-					break;
+						break;
+					}
 				}
 			}
 		}
@@ -532,7 +586,7 @@ void PPU2C02::clock(){
 
 		if(bSpriteZeroHitPossible && bSpriteZeroBeingRendered){
 			if(ppumask.bg & ppumask.s){
-				if(~(ppumask.bg | ppumask.s)){
+				if(!(ppumask.bgL | ppumask.sL)){
 					if(9 <= cycle && cycle < 258){
 						ppustatus.S = 1;
 					}
@@ -547,16 +601,18 @@ void PPU2C02::clock(){
 
 	if(0 <= scanline && scanline <= 240 && 0 <= cycle && cycle <= 256){
 		uint32_t bgColor = getColor(palette, pixel);
-		windowPixelColor[(scanline % 240) * 256 + ((cycle-1) % 256)] = bgColor;
+		windowPixelColor[(scanline % 240) * 256 + (cycle % 256)] = bgColor;
 		updateScreen();
 	}
 
 	cycle++;
-	if(cycle >= 341){
+	if(341 <= cycle){
 		cycle = 0;
 		scanline++;
 			
-		if(scanline >= 261)
+		if(261 <= scanline){
 			scanline = -1;
+			oddFrame = !oddFrame;
+		}
 	}
 }

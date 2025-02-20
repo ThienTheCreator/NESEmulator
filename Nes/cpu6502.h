@@ -19,12 +19,9 @@ public:
 
 	uint8_t waitCycle = 0; // cycles taken for an instruction
 
-	CPU6502(){
-		pc = 0xFFFC;
-		s = 0xFD;
-
-		p = 0x24;
-	}
+	CPU6502();
+	
+	void reset();
 
 	void connectBus(Bus* b){ bus = b; }
 	
@@ -34,6 +31,7 @@ public:
 		Interrupt = 2,
 		Decimal = 3,
 		Break = 4,
+		Unused = 5,
 		Overflow = 6,
 		Negative = 7
 	};
@@ -46,12 +44,27 @@ public:
 
 	bool getFlag(uint8_t bit);
 
+	enum addressingMode{
+		Immediate = 10,
+		ZeroPage = 11,
+		ZeroPageX = 12,
+		ZeroPageY = 13,
+		Relative = 14,
+		Absolute = 15,
+		AbsoluteX = 16,
+		AbsoluteY = 17,
+		Indirect = 18,
+		IndexedIndirect = 19,
+		IndirectIndexed = 20
+	};
+
+	bool pageCrossed = false;
+
+	uint16_t getModeInstruction(int);
 
 	void irq();
 
 	void nmi();
-
-	void reset();
 
 	/* 
 	** Load or Store Operations 
@@ -266,23 +279,10 @@ public:
 	// Return from Interrupt
 	void rti();
 
-
-	enum addressingMode{
-		Immediate = 10,
-		ZeroPage = 11,
-		ZeroPageX = 12,
-		ZeroPageY = 13,
-		Relative = 14,
-		Absolute = 15,
-		AbsoluteX = 16,
-		AbsoluteY = 17,
-		Indirect = 18,
-		IndexedIndirect = 19,
-		IndirectIndexed = 20
-	};
-
-	uint16_t getModeInstruction(int);
+	// Combined operations
+	void lax(uint8_t value);
 
 	void clock();
+	
 	void executeInstruction(uint8_t opcode);
 };

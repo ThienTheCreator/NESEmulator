@@ -5,6 +5,20 @@
 
 using namespace std;
 
+Bus::Bus(){
+	cpu.connectBus(this);
+}
+
+void Bus::reset(){
+	cpu.reset();
+	ppu.reset();
+	dmaPage = 0x0;
+	dmaAddr = 0x0;
+	dmaData = 0x0;
+	dmaDummy = true;
+	dmaData = false;
+}
+
 void Bus::writeCartridge(uint16_t address, uint8_t value){
 	cartridge[address] = value;
 }
@@ -16,7 +30,7 @@ void Bus::loadPpuRom(){
 };
 
 void Bus::loadCartridge(){
-	std::ifstream myfile("donkey kong.nes");
+	std::ifstream myfile("nestest.nes");
 	char c;
 	for(int i = 0; i < 16; i++){
 		myfile.get(c);
@@ -68,7 +82,9 @@ void Bus::cpuWrite(uint16_t address, uint8_t value){
 	}
 
 	if(address == 0x4014){
-		ppu.write(0x4014, value);
+		dmaPage = value;
+		dmaAddr = 0x00;
+		dmaTransfer = true;
 	}
 
 	if(address == 0x4016 || address == 0x4017){
@@ -88,17 +104,33 @@ void Bus::cpuWrite(uint16_t address, uint8_t value){
 #include <iostream>
 
 void Bus::clock(){
-	uint16_t test = cpuRead(0xfffc);
-	test |= cpuRead(0xfffd) << 8;
-
-	cpu.pc = test;
-
 	int temp = 0;
-	while(temp < 16384 * 60){
+	cpu.pc = 0xC000;
+	while(temp < 16384 * 4){
 		ppu.clock();
-		
+				
 		if(temp % 3 == 0){
-			cpu.clock();
+			if(dmaTransfer){
+				if(dmaDummy){
+					if(temp % 2 == 1){
+						dmaDummy = false;
+					}
+				} else {
+					if(temp % 2 == 0) {
+						dmaData = cpuRead(dmaPage << 8 | dmaAddr);
+					} else {
+						ppu.pOAM[dmaAddr] = dmaData;
+						dmaAddr++;
+
+						if(dmaAddr == 0x0){
+							dmaTransfer = false;
+							dmaDummy = true;
+						}
+					}
+				}
+			} else {
+				cpu.clock();
+			}
 		}
 
 		if(ppu.nmi){
@@ -108,5 +140,8 @@ void Bus::clock(){
 
 		temp++;
 	}
+
+	cout << hex << (int)cpuRead(0x200) << endl;
+	cout << (int)cpuRead(0x300) << endl;
 
 }

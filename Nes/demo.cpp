@@ -11,11 +11,11 @@
 
 using namespace std;
 
-Bus bus;
-
 int main() {
+	Bus bus;
 	bus.cpu.connectBus(&bus);
 	bus.loadCartridge();
+	bus.reset();
 	bus.controller[0] = 0x80;
 	bus.clock();
 
