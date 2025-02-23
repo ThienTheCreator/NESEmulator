@@ -8,6 +8,7 @@ class Bus{
 	uint8_t cartridge[24576];
 	uint8_t cpuRam[2048];
 	uint8_t controllerState[2];
+	uint8_t nesClockCount = 0;
 public:
 	Bus();
 
@@ -16,8 +17,6 @@ public:
 	uint16_t cycle = 0;
 	CPU6502 cpu;
 	PPU2C02 ppu;
-
-	uint8_t controller[2];
 
 	uint8_t dmaPage = 0x0;
 	uint8_t dmaAddr = 0x0;

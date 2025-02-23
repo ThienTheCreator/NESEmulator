@@ -615,7 +615,6 @@ void CPU6502::bcc(int8_t displacement){
 	bool carryFlag = getFlag(Carry);
 	
 	if(!carryFlag){
-		waitCycle++;
 		uint16_t address = pc + displacement;
 
 		waitCycle++;
@@ -631,7 +630,6 @@ void CPU6502::bcs(int8_t displacement){
 	bool carryFlag = getFlag(Carry);
 	
 	if(carryFlag){
-		waitCycle++;
 		uint16_t address = pc + displacement;
 
 		waitCycle++;
@@ -647,7 +645,6 @@ void CPU6502::beq(int8_t displacement){ // TODO
 	bool zeroFlag = getFlag(Zero);
 	
 	if(zeroFlag){
-		waitCycle++;
 		uint16_t address = pc + displacement;
 
 		waitCycle++;
@@ -664,8 +661,6 @@ void CPU6502::bmi(int8_t displacement){
 	bool negativeFlag = getFlag(Negative);
 	
 	if(negativeFlag){
-		waitCycle++;
-		
 		uint16_t address = pc + displacement;
 
 		waitCycle++;
@@ -681,8 +676,6 @@ void CPU6502::bne(int8_t displacement){
 	bool zeroFlag = getFlag(Zero);
 	
 	if(!zeroFlag){
-		waitCycle++;
-		
 		uint16_t address = pc + displacement;
 
 		waitCycle++;
@@ -698,8 +691,6 @@ void CPU6502::bpl(int8_t displacement){
 	bool negativeFlag = getFlag(Negative);
 	
 	if(!negativeFlag){
-		waitCycle++;
-		
 		uint16_t address = pc + displacement;
 
 		waitCycle++;
@@ -715,8 +706,6 @@ void CPU6502::bvc(int8_t displacement){
 	bool overflowFlag = getFlag(Overflow);
 	
 	if(!getFlag(Overflow)){
-		waitCycle++;
-		
 		uint16_t address = pc + displacement;
 
 		waitCycle++;
@@ -732,8 +721,6 @@ void CPU6502::bvs(int8_t displacement){
 	bool overflowFlag = getFlag(Overflow);
 	
 	if(overflowFlag){
-		waitCycle++;
-		
 		uint16_t address = pc + displacement;
 
 		waitCycle++;
@@ -830,6 +817,10 @@ void CPU6502::lax(uint8_t value){
 	tax();
 }
 
+void CPU6502::sax(uint16_t address){
+	bus->cpuWrite(address, a & x);
+}
+
 void CPU6502::irq(){
 	if(getFlag(Interrupt) == 0){
 		bus->cpuWrite(0x100 | s, (pc >> 8) & 0x00FF);
@@ -876,7 +867,7 @@ void CPU6502::clock(){
 	if(waitCycle <= 0){
 		handleFlag(Unused, true);
 
-		if(true){ // debug
+		if(false){ // debug
 			cout << uppercase << hex;
 			cout << /* "PC:" << */ setw(4) << pc;
 			cout << " A:" << setfill('0') << setw(2) << (int)a;
@@ -2005,6 +1996,26 @@ void CPU6502::executeInstruction(uint8_t opcode){
 		
 		if(pageCrossed)
 			waitCycle++;
+	}
+
+	if(opcode == 0x87){
+		uint16_t address = getModeInstruction(ZeroPage);
+		sax(address);
+	}
+
+	if(opcode == 0x97){
+		uint16_t address = getModeInstruction(ZeroPageY);
+		sax(address);
+	}
+
+	if(opcode == 0x8F){
+		uint16_t address = getModeInstruction(Absolute);
+		sax(address);
+	}
+
+	if(opcode == 0x83){
+		uint16_t address = getModeInstruction(IndexedIndirect);
+		sax(address);
 	}
 	
 	if(opcode == 0xA3){

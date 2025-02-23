@@ -281,6 +281,7 @@ public:
 
 	// Combined operations
 	void lax(uint8_t value);
+	void sax(uint16_t address);
 
 	void clock();
 	

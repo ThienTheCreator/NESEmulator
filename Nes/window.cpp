@@ -1,4 +1,4 @@
-#define _HAS_STD_BYTE 0
+#include "ppu2C02.h"
 
 #include "window.h"
 
@@ -7,8 +7,68 @@ uint32_t windowPixelColor[windowWidth * windowHeight] = {0};
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	wchar_t msg[32];
 	switch (uMsg)
 	{
+		// s d f enter 
+		case WM_KEYDOWN:
+			switch(wParam){
+				case 0x46: // F - A
+					controller |= 0x80;
+					break;
+				case 0x44: // D - B 
+					controller |= 0x40;
+					break;
+				case 0x53: // S - Select
+					controller |= 0x20;
+					break;
+				case 0x0D: // Enter - Start
+					controller |= 0x10;
+					break;
+				case 0x26: // UP 
+					controller |= 0x8;
+					break;
+				case 0x28: // Down
+					controller |= 0x4;
+					break;
+				case 0x25: // Left
+					controller |= 0x2;
+					break;
+				case 0x27: // Right
+					controller |= 0x1;
+					break;
+			}
+			break;
+
+		case WM_KEYUP:
+			switch(wParam){
+				case 0x46: // F - A
+					controller &= ~0x80;
+					break;
+				case 0x44: // D - B 
+					controller &= ~0x40;
+					break;
+				case 0x53: // S - Select
+					controller &= ~0x20;
+					break;
+				case 0x0D: // Enter - Start
+					controller &= ~0x10;
+					break;
+				case 0x26: // UP 
+					controller &= ~0x8;
+					break;
+				case 0x28: // Down
+					controller &= ~0x4;
+					break;
+				case 0x25: // Left
+					controller &= ~0x2;
+					break;
+				case 0x27: // Right
+					controller &= ~0x1;
+					break;
+			}
+			break;
+
 		case WM_PAINT:
 		{
 			PAINTSTRUCT ps;
@@ -24,7 +84,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			memset(&bmi, 0, sizeof(BITMAPINFO));
 			bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 			bmi.bmiHeader.biWidth = 256;
-			bmi.bmiHeader.biHeight = 240;
+			bmi.bmiHeader.biHeight = -240;
 			bmi.bmiHeader.biPlanes = 1;
 			bmi.bmiHeader.biBitCount = 32;
 			bmi.bmiHeader.biCompression = BI_RGB;
@@ -47,7 +107,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			return 0;
 		}
+
 		case WM_DESTROY:
+			runProgram = false;
 			PostQuitMessage(0);
 			return 0;
 	}
@@ -62,26 +124,32 @@ void updateScreen(){
 DWORD WINAPI ep(void* data){
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 
-	const wchar_t CLASS_NAME[] = L"Sample Window Class";
+	const wchar_t CLASSNAME[] = L"Sample Window Class";
 
-	WNDCLASS wc = { };
+	WNDCLASS wc = { 0 };
 
 	wc.lpfnWndProc   = WindowProc;
 	wc.hInstance     = hInstance;
-	wc.lpszClassName = CLASS_NAME;
+	wc.lpszClassName = CLASSNAME;
 
 	RegisterClass(&wc);
 
+	RECT r;
+	r.left = 0;
+	r.top = 0;
+	r.right = 256;
+	r.bottom = 240;
+	AdjustWindowRectEx(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+
 	// Create the window.
-	
 	wind = CreateWindowEx(
 		0,
-		CLASS_NAME,
+		CLASSNAME,
 		L"Learn to Program Windows",
-		WS_OVERLAPPED | WS_MINIMIZEBOX | WS_SYSMENU,
+		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, 
 
 		// Size and position
-		CW_USEDEFAULT, CW_USEDEFAULT, 256, 240,
+		CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom-r.top,
 
 		NULL,
 		NULL,

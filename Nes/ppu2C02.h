@@ -8,28 +8,23 @@
 
 #include "window.h"
 
-class PPU2C02{
+class PPU2C02{	
 	uint32_t color[64];
-	static const uint16_t width = 256;
-	static const uint16_t height = 240;
-	uint32_t screen[width * height];
 
 	uint8_t patternTable[2][4096];
 	uint8_t nameTable[4][1024];
 	uint8_t paletteTable[32];
 
 	uint8_t ppuGenLatch = 0;
-	uint8_t ppuDataBuffer = 0;
-
 
 	union loopyRegister{
 		struct{
-			uint8_t coarseX :5;
-			uint8_t coarseY :5;
-			uint8_t nametableX: 1;
-			uint8_t nametableY: 1;
-			uint8_t fineY : 3;
-			uint8_t unused: 1;
+			uint16_t coarseX :5;
+			uint16_t coarseY :5;
+			uint16_t nametableX: 1;
+			uint16_t nametableY: 1;
+			uint16_t fineY : 3;
+			uint16_t unused: 1;
 		};
 		uint16_t reg;
 	} v, t;
@@ -37,6 +32,8 @@ class PPU2C02{
 	uint8_t x: 3;
 	uint8_t w: 1;
 
+	uint8_t ppuDataBuffer = 0;
+	
 	uint8_t bgNextTileId = 0;
 	uint8_t bgNextTileAttribute = 0;
 	uint8_t bgNextTileLs = 0;
@@ -59,6 +56,8 @@ class PPU2C02{
 
 	HANDLE thread = CreateThread(NULL, 0, ep, NULL, 0, NULL);
 public:
+	PPU2C02();
+	
 	union PPUCTRL{
 		struct {
 			uint8_t nametableX: 1; // nametable x
@@ -75,7 +74,7 @@ public:
 
 	union PPUMASK{
 		struct{
-			uint8_t Greyscale:1;    // Greyscale
+			uint8_t greyscale:1;    // Greyscale
 			uint8_t bgL:1; 			// Bg leftmost
 			uint8_t sL:1; 			// sprite leftmost
 			uint8_t bg:1; 			// Bg rendering
@@ -104,11 +103,6 @@ public:
 		uint8_t x;
 	} oam[64];
 
-	PPU2C02();
-
-	uint8_t* cart;
-	void connectCartridge(uint8_t* cartridge);
-	void reset();
 
 	spriteObject spriteScanline[8];
 
@@ -123,16 +117,16 @@ public:
 	uint8_t ppuData = 0;
 	uint8_t oamDma = 0;
 	
-	bool nmi = false;
-
-	void setupColor();
 	uint32_t getColor(uint8_t palette, uint8_t pixel);
 
-	uint8_t getValue(uint16_t address);
-	void setValue(uint16_t address, uint8_t value);
+	uint8_t ppuRead(uint16_t address);
+	void ppuWrite(uint16_t address, uint8_t value);
  
-	uint8_t read(uint16_t address);
-	void write(uint16_t address, uint8_t value);
+	uint8_t cpuRead(uint16_t address);
+	void cpuWrite(uint16_t address, uint8_t value);
 
 	void clock();
+	void reset();
+	
+	bool nmi = false;
 };

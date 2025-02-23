@@ -8,7 +8,7 @@
 
 using namespace std;
 
-void PPU2C02::setupColor(){
+PPU2C02::PPU2C02(){
 	color[0]  = 0x62626200;
 	color[1]  = 0x01209000;
 	color[2]  = 0x240BA000;
@@ -75,14 +75,6 @@ void PPU2C02::setupColor(){
 	color[63] = 0x00000000;
 }
 
-PPU2C02::PPU2C02(){
-	setupColor();
-}
-
-void PPU2C02::connectCartridge(uint8_t* cartridge){
-	cart = cartridge;
-}
-
 void PPU2C02::reset(){
 	x = 0;
 	w = 0;
@@ -104,7 +96,7 @@ void PPU2C02::reset(){
 	t.reg = 0;
 }
 
-uint8_t PPU2C02::getValue(uint16_t address){
+uint8_t PPU2C02::ppuRead(uint16_t address){
 	address &= 0x3FFF;
 
 	if(0x000 <= address && address <= 0xFFF){
@@ -143,13 +135,13 @@ uint8_t PPU2C02::getValue(uint16_t address){
 		if(address == 0x1C)
 			address = 0xC;
 
-		return paletteTable[address] & (ppumask.Greyscale ? 0x30 : 0x3F);
+		return paletteTable[address] & (ppumask.greyscale ? 0x30 : 0x3F);
 	}
 
 	return 0;
 }
 
-void PPU2C02::setValue(uint16_t address, uint8_t value){
+void PPU2C02::ppuWrite(uint16_t address, uint8_t value){
 	address &= 0x3FFF;
 
 	if(0x000 <= address && address <= 0xFFF){
@@ -194,20 +186,21 @@ void PPU2C02::setValue(uint16_t address, uint8_t value){
 }
 
 // communication used by cpu
-uint8_t PPU2C02::read(uint16_t address){
-	if(address == 0x2002){
+uint8_t PPU2C02::cpuRead(uint16_t address){
+	ppuGenLatch = 0;
+	if(address == 0x2){
 		ppuGenLatch = (ppustatus.reg & 0xE0) | (ppuDataBuffer & 0x1F);
 		ppustatus.V = 0;
 		w = 0;
 	}
 
-	if(address == 0x2004){
+	if(address == 0x4){
 		ppuGenLatch = pOAM[oamAddr];
 	}
 
-	if(address == 0x2007){
+	if(address == 0x7){
 		ppuGenLatch = ppuDataBuffer;
-		ppuDataBuffer = getValue(v.reg);
+		ppuDataBuffer = ppuRead(v.reg);
 
 		if(v.reg >= 0x3F00) 
 			ppuGenLatch = ppuDataBuffer;
@@ -219,26 +212,26 @@ uint8_t PPU2C02::read(uint16_t address){
 }
 
 // communication used by cpu
-void PPU2C02::write(uint16_t address, uint8_t value){
-	if(address == 0x2000){
+void PPU2C02::cpuWrite(uint16_t address, uint8_t value){
+	if(address == 0x0){
 		ppuctrl.reg = value;
 		t.nametableX = ppuctrl.nametableX;
 		t.nametableY = ppuctrl.nametableY;
 	} 
 
-	if(address == 0x2001){
+	if(address == 0x1){
 		ppumask.reg = value;
 	}
 
-	if(address == 0x2003){
+	if(address == 0x3){
 		oamAddr = value;
 	}
 
-	if(address == 0x2004){
+	if(address == 0x4){
 		pOAM[oamAddr] = value;
 	}
 
-	if(address == 0x2005){
+	if(address == 0x5){
 		if(w == 0){ // first write
 			x = value & 0x07;
 			t.coarseX = value >> 3;
@@ -250,7 +243,7 @@ void PPU2C02::write(uint16_t address, uint8_t value){
 		}
 	}
 
-	if(address == 0x2006){
+	if(address == 0x6){
 		if(w == 0){ // first write
 			t.reg = (uint16_t)((value & 0x3F) << 8) | (t.reg & 0x00FF);
 			w = 1;
@@ -261,14 +254,14 @@ void PPU2C02::write(uint16_t address, uint8_t value){
 		}
 	}
 
-	if(address == 0x2007){
-		setValue(v.reg, value);
+	if(address == 0x7){
+		ppuWrite(v.reg, value);
 		v.reg += (ppuctrl.i ? 32 : 1);
 	}
 }
 
 uint32_t PPU2C02::getColor(uint8_t palette, uint8_t pixel){
-	return color[getValue(0x3F00 + (palette << 2) + pixel) & 0x3F];
+	return color[ppuRead(0x3F00 + (palette << 2) + pixel) & 0x3F];
 };
 
 void PPU2C02::clock(){
@@ -358,7 +351,7 @@ void PPU2C02::clock(){
 			}	
 		}
 
-		if(scanline == 0 && cycle == 0 && oddFrame && (ppumask.bg | ppumask.s))
+		if(scanline == 0 && cycle == 0)
 			cycle = 1;
 
 		if((2 <= cycle && cycle < 258) || (321 <= cycle && cycle < 338)){
@@ -366,11 +359,11 @@ void PPU2C02::clock(){
 
 			if((cycle - 1) % 8 == 0){
 				loadBgShifters();
-				bgNextTileId = getValue(0x2000 | (v.reg & 0xFFF));
+				bgNextTileId = ppuRead(0x2000 | (v.reg & 0xFFF));
 			}
 			
 			if((cycle - 1) % 8 == 2){
-				bgNextTileAttribute = getValue(0x23C0 | (v.nametableY << 11) 
+				bgNextTileAttribute = ppuRead(0x23C0 | (v.nametableY << 11) 
 													| (v.nametableX << 10) 
 													| ((v.coarseY >> 2) << 3)
 													| (v.coarseX >> 2));
@@ -381,15 +374,15 @@ void PPU2C02::clock(){
 			}
 			
 			if((cycle - 1) % 8 == 4){
-				bgNextTileLs = getValue((ppuctrl.b << 12) 
+				bgNextTileLs = ppuRead((ppuctrl.b << 12) 
 										+ ((uint16_t)bgNextTileId << 4)
 										+ v.fineY);
 			}
 			
 			if((cycle - 1) % 8 == 6){
-				bgNextTileMs = getValue((ppuctrl.b << 12)
+				bgNextTileMs = ppuRead((ppuctrl.b << 12)
 										+ ((uint16_t)bgNextTileId << 4) 
-										+ v.fineY + 8);
+										+ (v.fineY) + 8);
 			}
 
 			if((cycle - 1) % 8 == 7){
@@ -407,14 +400,14 @@ void PPU2C02::clock(){
 		}
 
 		if(cycle == 338 || cycle == 340){
-			bgNextTileId = getValue(0x2000 | (v.reg & 0xFFF));
+			bgNextTileId = ppuRead(0x2000 | (v.reg & 0xFFF));
 		}
 
 		if(scanline == -1 && 280 <= cycle && cycle < 305){
 			transferAddressY();
 		}
 
-		if(cycle == 257 && scanline >= 0){
+		if(cycle == 257 && 0 <= scanline){
 			std::memset(spriteScanline, 0xFF, 8 * sizeof(spriteObject));
 			spriteCount = 0;
 
@@ -428,23 +421,23 @@ void PPU2C02::clock(){
 			bSpriteZeroHitPossible = false;
 
 			while(nOAMEntry < 64 && spriteCount < 9){
-				int16_t diff = ((int16_t) scanline - (int16_t)oam[nOAMEntry].y);
+				int16_t diff = ((int16_t)scanline - (int16_t)oam[nOAMEntry].y);
 
-				if(diff >= 0 && diff < (ppuctrl.h ? 16 : 8) && spriteCount < 8){
+				if(0 <= diff && diff < (ppuctrl.h ? 16 : 8)){
 					if(spriteCount < 8){
 						if(nOAMEntry == 0){
 							bSpriteZeroHitPossible = true;
 						}
 
 						memcpy(&spriteScanline[spriteCount], &oam[nOAMEntry], sizeof(spriteObject));
+						spriteCount++;
 					}
-					spriteCount++;
 				}
 
 				nOAMEntry++;
 			}
 
-			ppustatus.O = (spriteCount >= 8);
+			ppustatus.O = (spriteCount > 8);
 		}
 		
 		if(cycle == 340){
@@ -488,8 +481,8 @@ void PPU2C02::clock(){
 
 				spritePatternAddrMs = spritePatternAddrLs + 8;
 
-				spritePatternBitsLs = getValue(spritePatternAddrLs);
-				spritePatternBitsMs = getValue(spritePatternAddrMs);
+				spritePatternBitsLs = ppuRead(spritePatternAddrLs);
+				spritePatternBitsMs = ppuRead(spritePatternAddrMs);
 
 				if(spriteScanline[i].attribute & 0x40){
 					auto flipbyte = [](uint8_t b){
@@ -522,17 +515,15 @@ void PPU2C02::clock(){
 	uint8_t bgPalette = 0;
 
 	if(ppumask.bg){
-		if(ppumask.bgL || (cycle >= 9)){
-			uint16_t bit_mux = 0x8000 >> x;
+		uint16_t bit_mux = 0x8000 >> x;
 
-			uint8_t pixelLs = (bgShifterPatternLs & bit_mux) != 0;
-			uint8_t pixelMs = (bgShifterPatternMs & bit_mux) != 0;
-			uint8_t bgPixel = (pixelMs << 1) | pixelLs;
+		uint8_t pixelLs = (bgShifterPatternLs & bit_mux) != 0;
+		uint8_t pixelMs = (bgShifterPatternMs & bit_mux) != 0;
+		bgPixel = (pixelMs << 1) | pixelLs;
 
-			uint8_t palLs = (bgShifterAttributeLs & bit_mux) != 0;
-			uint8_t palMs = (bgShifterAttributeMs & bit_mux) != 0;
-			uint8_t bgPalette = (palMs << 1) | palLs;
-		}
+		uint8_t palLs = (bgShifterAttributeLs & bit_mux) != 0;
+		uint8_t palMs = (bgShifterAttributeMs & bit_mux) != 0;
+		bgPalette = (palMs << 1) | palLs;
 	}
 
 	uint8_t fgPixel = 0;
@@ -540,24 +531,21 @@ void PPU2C02::clock(){
 	uint8_t fgPriority = 0;
 
 	if(ppumask.s){
-		if(ppumask.sL || cycle >= 9){
-			bSpriteZeroBeingRendered = false;
-			for(int i = 0; i < spriteCount; ++i){
-				if(spriteScanline[i].x == 0){
-					uint8_t fgPixelLs = (spriteShifterPatternLs[i] & 0x80) > 0;
-					uint8_t fgPixelMs = (spriteShifterPatternMs[i] & 0x80) > 0;
-					fgPixel = (fgPixelMs << 1) | fgPixelLs;
+		bSpriteZeroBeingRendered = false;
+		for(int i = 0; i < spriteCount; ++i){
+			if(spriteScanline[i].x == 0){
+				uint8_t fgPixelLs = (spriteShifterPatternLs[i] & 0x80) > 0;
+				uint8_t fgPixelMs = (spriteShifterPatternMs[i] & 0x80) > 0;
+				fgPixel = (fgPixelMs << 1) | fgPixelLs;
 
-					fgPalette = (spriteScanline[i].attribute & 0x03) + 0x04;
-					fgPriority = (spriteScanline[i].attribute & 0x20) == 0;
+				fgPalette = (spriteScanline[i].attribute & 0x03) + 0x04;
+				fgPriority = (spriteScanline[i].attribute & 0x20) == 0;
 			
-					if(fgPixel != 0){
-						if(i == 0){
-							bSpriteZeroBeingRendered = true;
-						}
-
-						break;
+				if(fgPixel != 0){
+					if(i == 0){
+						bSpriteZeroBeingRendered = true;
 					}
+					break;
 				}
 			}
 		}
@@ -599,9 +587,9 @@ void PPU2C02::clock(){
 		}
 	}
 
-	if(0 <= scanline && scanline <= 240 && 0 <= cycle && cycle <= 256){
+	if(0 < scanline && scanline < 240 && 0 < (cycle - 1) && (cycle - 1) < 256){
 		uint32_t bgColor = getColor(palette, pixel);
-		windowPixelColor[(scanline % 240) * 256 + (cycle % 256)] = bgColor;
+		windowPixelColor[(scanline % 240) * 256 + (cycle - 1)] = bgColor;
 		updateScreen();
 	}
 
@@ -612,7 +600,6 @@ void PPU2C02::clock(){
 			
 		if(261 <= scanline){
 			scanline = -1;
-			oddFrame = !oddFrame;
 		}
 	}
 }

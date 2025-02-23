@@ -15,6 +15,9 @@ void updateScreen();
 
 inline HWND wind = NULL;
 
+inline uint8_t controller;
+inline bool runProgram = true;
+
 const int windowWidth = 256;
 const int windowHeight = 240;
 extern uint32_t windowPixelColor[windowWidth * windowHeight];
