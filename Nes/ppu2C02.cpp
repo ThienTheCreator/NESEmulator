@@ -588,9 +588,11 @@ void PPU2C02::clock(){
 	}
 
 	if(0 < scanline && scanline < 240 && 0 < (cycle - 1) && (cycle - 1) < 256){
-		uint32_t bgColor = getColor(palette, pixel);
-		windowPixelColor[(scanline % 240) * 256 + (cycle - 1)] = bgColor;
-		updateScreen();
+		uint32_t pixelColor = getColor(palette, pixel);
+		if(windowPixelColor[scanline * 256 + (cycle - 1)] != pixelColor){
+			windowPixelColor[(scanline % 240) * 256 + (cycle - 1)] = pixelColor;
+			updateScreen();
+		}
 	}
 
 	cycle++;
