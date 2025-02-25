@@ -71,13 +71,13 @@ public:
 	*/
 
 	// Load Accumulator
-	void lda(uint8_t address);
+	void lda(uint8_t value);
 
 	// Load X Register
-	void ldx(uint8_t address);
+	void ldx(uint8_t value);
 
 	// Load Y Register
-	void ldy(uint16_t address);
+	void ldy(uint8_t value);
 
 	// Store Accumulator
 	void sta(uint16_t address);

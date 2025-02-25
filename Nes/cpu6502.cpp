@@ -67,93 +67,88 @@ bool CPU6502::getFlag(uint8_t bit){
 uint16_t CPU6502::getModeInstruction(int mode){
 	pc++;
 
-	if(mode == Immediate){ // Immediate
-		return bus->cpuRead(pc);
-	}
+	uint16_t address;
+	uint16_t temp;
+	uint8_t displacement;
+	
+	switch(mode){
+		case Immediate: 
+			return bus->cpuRead(pc);
+	
+		case ZeroPage:
+			return bus->cpuRead(pc) & 0xFF;
+	
+		case ZeroPageX:
+			address = bus->cpuRead(pc);
+			return (uint8_t)(address + x) & 0xFF;
 
-	if(mode == ZeroPage){ // Zero Page
-		return bus->cpuRead(pc) & 0xFF;
-	}
+	
+		case ZeroPageY:
+			address = bus->cpuRead(pc);
+			return (uint8_t)(address + y) & 0xFF;
+	
+		case Relative:
+			displacement = bus->cpuRead(pc);
+			return displacement;
+	
+		case Absolute:
+			address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
+			return address;
+	
+		case AbsoluteX:
+		 	address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
+			temp = address;
+			address += x;
+			
+			if((address & 0xFF00) != (temp & 0xFF00)){
+				pageCrossed = true;
+			} else {
+				pageCrossed = false;
+			}
+			
+			return address;
 
-	if(mode == ZeroPageX){ // Zero Page X
-		uint16_t address = bus->cpuRead(pc);
-		return (uint8_t)(address + x) & 0xFF;
-	}
+	
+		case AbsoluteY:
+			address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
+			temp = address;
+			address += y;
 
-	if(mode == ZeroPageY){
-		uint16_t address = bus->cpuRead(pc);
-		return (uint8_t)(address + y) & 0xFF;
-	}
-
-	if(mode == Relative){
-		uint8_t displacement = bus->cpuRead(pc);
-
-		return displacement;
-	}
-
-	if(mode == Absolute){ // Absolute
-		uint16_t address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
+			if((address & 0xFF00) != (temp & 0xFF00)){
+				pageCrossed = true;
+			} else {
+				pageCrossed = false;
+			}
 		
-		return address;
-	}
+			return address;
 
-	if(mode == AbsoluteX){ // Absolute X
-	 	uint16_t address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
-		uint16_t temp = address;
-		address += x;
-		
-		if((address & 0xFF00) != (temp & 0xFF00)){
-			pageCrossed = true;
-		} else {
-			pageCrossed = false;
-		}
-		
-		return address;
-	}
+		case Indirect:
+			address = bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
+			address = bus->cpuRead(address) | (bus->cpuRead(address & 0xFF00 | ((address + 1) & 0x00FF)) << 8);
 
-	if(mode == AbsoluteY){ // Absolute Y
-		uint16_t address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
-		uint16_t temp = address;
-		address += y;
+			return address;
 
-		if((address & 0xFF00) != (temp & 0xFF00)){
-			pageCrossed = true;
-		} else {
-			pageCrossed = false;
-		}
+		case IndexedIndirect:
+			address = bus->cpuRead(pc);
+			address = (address + x) & 0xFF;
+			address = bus->cpuRead(address & 0xFF) | (bus->cpuRead(address & 0xFF00 | ((address + 1) & 0x00FF)) << 8);
 		
-		return address;
-	}
+			return address;
 
-	if(mode == Indirect){
-		uint16_t address = bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
-		address = bus->cpuRead(address) | (bus->cpuRead(address & 0xFF00 | ((address + 1) & 0x00FF)) << 8);
-
-		return address;
-	}
-
-	if(mode == IndexedIndirect){ // Index Indirect: (indirect,x)
-		uint16_t address = bus->cpuRead(pc);
-		address = (address + x) & 0xFF;
-		address = bus->cpuRead(address & 0xFF) | (bus->cpuRead(address & 0xFF00 | ((address + 1) & 0x00FF)) << 8);
+		case IndirectIndexed:
+			address = bus->cpuRead(pc);
+			address = bus->cpuRead(address) | (bus->cpuRead(address & 0xFF00 | ((address + 1) & 0x00FF)) << 8);
 		
-		return address;
-	}
-
-	if(mode == IndirectIndexed){ // Indirect Index: (indirect),y
-		uint16_t address = bus->cpuRead(pc);
-		address = bus->cpuRead(address) | (bus->cpuRead(address & 0xFF00 | ((address + 1) & 0x00FF)) << 8);
+			temp = address;
+			address = address + y;
+			
+			if((address & 0xFF00) != (temp & 0xFF00)){
+				pageCrossed = true;
+			} else {
+				pageCrossed = false;
+			}
 		
-		uint16_t temp = address;
-		address = address + y;
-		
-		if((address & 0xFF00) != (temp & 0xFF00)){
-			pageCrossed = true;
-		} else {
-			pageCrossed = false;
-		}
-		
-		return address;
+			return address;
 	}
 
 	return 0;
@@ -178,7 +173,7 @@ void CPU6502::ldx(uint8_t value){
 }
 
 // Load Y Register
-void CPU6502::ldy(uint16_t value){
+void CPU6502::ldy(uint8_t value){
 	y = value;
 	handleFlag(Zero, y == 0);
 	handleFlag(Negative, y & 0x80);
@@ -894,1220 +889,1358 @@ void CPU6502::clock(){
 }
 
 void CPU6502::executeInstruction(uint8_t opcode){
-	if(opcode == 0xA9){
-		uint8_t value = getModeInstruction(Immediate);
-		lda(value);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xA5){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		lda(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0xB5){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->cpuRead(address);
-		lda(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xAD){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		lda(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xBD){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->cpuRead(address);
-		lda(value);
-		
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0xB9){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->cpuRead(address);
-		lda(value);
-		
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0xA1){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->cpuRead(address);
-		lda(value);
-
-		waitCycle += 6;
-	}
-
-	if(opcode == 0xB1){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->cpuRead(address);
-		lda(value);
-		
-		waitCycle += 5;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0xA2){
-		uint16_t value = getModeInstruction(Immediate);
-		ldx(value);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xA6){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		ldx(value);
-
-		waitCycle += 3;
-	}
-
-	if(opcode == 0xB6){
-		uint16_t address = getModeInstruction(ZeroPageY);
-		uint8_t value = bus->cpuRead(address);
-		ldx(value);
-
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xAE){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		ldx(value);
-
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xBE){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		uint16_t value = bus->cpuRead(address);
-		ldx(value);
+	uint16_t address;
+	uint16_t temp;
+	uint8_t displacement;
+	uint8_t value;
 	
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
+	switch(opcode){
+		case 0xA9:
+			value = getModeInstruction(Immediate);
+			lda(value);
+			waitCycle += 2;
+			break;
 
-	if(opcode == 0xA0){
-		uint16_t value = getModeInstruction(Immediate);
-		ldy(value);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xA4){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint16_t value = bus->cpuRead(address);
-		ldy(value);
-
-		waitCycle += 3;
-	}
-
-	if(opcode == 0xB4){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		uint16_t value = bus->cpuRead(address);
-		ldy(value);
-		
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xAC){
-		uint16_t address = getModeInstruction(Absolute);
-		uint16_t value = bus->cpuRead(address);
-		ldy(value);
-		
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xBC){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		uint16_t value = bus->cpuRead(address);
-		ldy(value);
 	
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
+		case 0xA5:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			lda(value);
+			waitCycle += 3;
+			break;
 
-	if(opcode == 0x85){
-		uint16_t address = getModeInstruction(ZeroPage);
-		sta(address);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x95){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		sta(address);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x8D){
-		uint16_t address = getModeInstruction(Absolute);
-		sta(address);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x9D){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		sta(address);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0x99){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		sta(address);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0x81){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		sta(address);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x91){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		sta(address);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x86){
-		uint16_t address = getModeInstruction(ZeroPage);
-		stx(address);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x96){
-		uint16_t address = getModeInstruction(ZeroPageY);
-		stx(address);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x8E){
-		uint16_t address = getModeInstruction(Absolute);
-		stx(address);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x84){
-		uint16_t address = getModeInstruction(ZeroPage);
-		sty(address);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x94){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		sty(address);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x8C){
-		uint16_t address = getModeInstruction(Absolute);
-		sty(address);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xAA){
-		tax();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xA8){
-		tay();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x8A){
-		txa();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x98){
-		tya();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xBA){
-		tsx();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x9A){
-		txs();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x48){
-		pha();
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x08){
-		php();
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x68){
-		pla();
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x28){
-		plp();
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x29){
-		uint8_t value = getModeInstruction(Immediate);
-		andL(value);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x25){
-		uint16_t address = getModeInstruction(ZeroPage);
-		int8_t value = bus->cpuRead(address);
-		andL(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x35){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		int8_t value = bus->cpuRead(address);
-		andL(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x2D){
-		uint16_t address = getModeInstruction(Absolute);
-		int8_t value = bus->cpuRead(address);
-		andL(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x3D){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		int8_t value = bus->cpuRead(address);
-		andL(value);
-
-		waitCycle += 4;
-
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0x39){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		int8_t value = bus->cpuRead(address);
-		andL(value);
 	
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
+		case 0xB5:
+			address = getModeInstruction(ZeroPageX);
+			value = bus->cpuRead(address);
+			lda(value);
+			waitCycle += 4;
+			break;
 
-	if(opcode == 0x21){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		int8_t value = bus->cpuRead(address);
-		andL(value);
-
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x31){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		int8_t value = bus->cpuRead(address);
-		andL(value);
 	
-		waitCycle += 5;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
+		case 0xAD:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			lda(value);
+			waitCycle += 4;
+			break;
 
-	if(opcode == 0x49){
-		uint8_t value = getModeInstruction(Immediate);
-		eor(value);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x45){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		eor(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x55){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->cpuRead(address);
-		eor(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x4D){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		eor(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x5D){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->cpuRead(address);
-		eor(value);
 	
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
+		case 0xBD:
+			address = getModeInstruction(AbsoluteX);
+			value = bus->cpuRead(address);
+			lda(value);
+			
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
 
-	if(opcode == 0x59){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->cpuRead(address);
-		eor(value);
 	
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
+		case 0xB9:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			lda(value);
+			
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
 
-	if(opcode == 0x41){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->cpuRead(address);
-		eor(value);
-
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x51){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->cpuRead(address);
-		eor(value);
 	
-		waitCycle += 5;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0x09){
-		uint8_t value = getModeInstruction(Immediate);
-		ora(value);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x05){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		ora(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x15){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->cpuRead(address);
-		ora(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x0D){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		ora(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x1D){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->cpuRead(address);
-		ora(value);
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0x19){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->cpuRead(address);
-		ora(value);
-		
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0x01){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->cpuRead(address);
-		ora(value);
-
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x11){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->cpuRead(address);
-		ora(value);
-		
-		waitCycle += 5;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0x24){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		bit(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x2C){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		bit(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x69){
-		uint8_t value = getModeInstruction(Immediate);
-		adc(value);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x65){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		adc(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x75){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->cpuRead(address);
-		adc(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x6D){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		adc(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0x7D){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->cpuRead(address);
-		adc(value);
-		
-		waitCycle += 4;
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0x79){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->cpuRead(address);
-		adc(value);
-
-		waitCycle += 4;
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0x61){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->cpuRead(address);
-		adc(value);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x71){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->cpuRead(address);
-		adc(value);
-
-		waitCycle += 5;
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0xE5){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		sbc(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0xF5){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->cpuRead(address);
-		sbc(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xED){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		sbc(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xFD){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->cpuRead(address);
-		sbc(value);
-		
-		waitCycle += 4;
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0xF9){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->cpuRead(address);
-		sbc(value);
+		case 0xA1:
+			address = getModeInstruction(IndexedIndirect);
+			value = bus->cpuRead(address);
+			lda(value);
 	
-		waitCycle += 4;
-		if(pageCrossed)
-			waitCycle++;
-	}
+			waitCycle += 6;
+			break;
 
-	if(opcode == 0xE1){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->cpuRead(address);
-		sbc(value);
-		
-		waitCycle += 6;
-	}
-
-	if(opcode == 0xF1){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->cpuRead(address);
-		sbc(value);
-
-		waitCycle += 5;
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0xC9){
-		uint8_t value = getModeInstruction(Immediate);
-		cmp(value);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xC5){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		cmp(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0xD5){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		uint8_t value = bus->cpuRead(address);
-		cmp(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xCD){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		cmp(value);
-		waitCycle += 4;
-	}
 	
-	if(opcode == 0xDD){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		uint8_t value = bus->cpuRead(address);
-		cmp(value);
+		case 0xB1:
+			address = getModeInstruction(IndirectIndexed);
+			value = bus->cpuRead(address);
+			lda(value);
+			
+			waitCycle += 5;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
 
-		waitCycle += 4;
-		if(pageCrossed)
-			waitCycle++;
-	}
 	
-	if(opcode == 0xD9){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->cpuRead(address);
-		cmp(value);
-
-		waitCycle += 4;
-		if(pageCrossed)
-			waitCycle++;
-	}
+		case 0xA2:
+			value = getModeInstruction(Immediate);
+			ldx(value);
 	
-	if(opcode == 0xC1){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->cpuRead(address);
-		cmp(value);
-		waitCycle += 6;
-	}
+			waitCycle += 2;
+			break;
+
 	
-	if(opcode == 0xD1){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->cpuRead(address);
-		cmp(value);
-		
-		waitCycle += 5;
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0xE0){
-		uint8_t value = getModeInstruction(Immediate);
-		cpx(value);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xE4){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		cpx(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0xEC){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		cpx(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xC0){
-		uint8_t value = getModeInstruction(Immediate);
-		cpy(value);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xC4){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		cpy(value);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0xCC){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		cpy(value);
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xE6){
-		uint16_t address = getModeInstruction(ZeroPage);
-		inc(address);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0xF6){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		inc(address);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0xEE){
-		uint16_t address = getModeInstruction(Absolute);
-		inc(address);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0xFE){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		inc(address);
-		waitCycle += 7;
-	}
-
-	if(opcode == 0xE8){
-		inx();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xC8){
-		iny();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xC6){
-		uint16_t address = getModeInstruction(ZeroPage);
-		dec(address);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0xD6){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		dec(address);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0xCE){
-		uint16_t address = getModeInstruction(Absolute);
-		dec(address);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0xDE){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		dec(address);
-		waitCycle += 7;
-	}
-
-	if(opcode == 0xCA){
-		dex();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x88){
-		dey();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x0A){
-		asl(a, true);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x06){
-		uint16_t address = getModeInstruction(ZeroPage);
-		asl(address, false);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0x16){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		asl(address, false);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x0E){
-		uint16_t address = getModeInstruction(Absolute);
-		asl(address, false);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x1E){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		asl(address, false);
-		waitCycle += 7;
-	}
-
-	if(opcode == 0x4A){
-		lsr(a, true);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x46){
-		uint16_t address = getModeInstruction(ZeroPage);
-		lsr(address, false);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0x56){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		lsr(address, false);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x4E){
-		uint16_t address = getModeInstruction(Absolute);
-		lsr(address, false);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x5E){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		lsr(address, false);
-		waitCycle += 7;
-	}
-
-	if(opcode == 0x2A){
-		rol(a, true);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x26){
-		uint16_t address = getModeInstruction(ZeroPage);
-		rol(address, false);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0x36){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		rol(address, false);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x2E){
-		uint16_t address = getModeInstruction(Absolute);
-		rol(address, false);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x3E){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		rol(address, false);
-		waitCycle += 7;
-	}
-
-	if(opcode == 0x6A){
-		ror(a, true);
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x66){
-		uint16_t address = getModeInstruction(ZeroPage);
-		ror(address, false);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0x76){
-		uint16_t address = getModeInstruction(ZeroPageX);
-		ror(address, false);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x6E){
-		uint16_t address = getModeInstruction(Absolute);
-		ror(address, false);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x7E){
-		uint16_t address = getModeInstruction(AbsoluteX);
-		ror(address, false);
-		waitCycle += 7;
-	}
-
-	if(opcode == 0x4C){
-		uint16_t address = getModeInstruction(Absolute);
-		jmp(address);
-		waitCycle += 3;
-	}
-
-	if(opcode == 0x6C){
-		uint16_t address = getModeInstruction(Indirect);
-		jmp(address);
-		waitCycle += 5;
-	}
-
-	if(opcode == 0x20){
-		uint16_t address = getModeInstruction(Absolute);
-		jsr(address);
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x60){
-		rts();
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x90){
-		uint8_t displacement = getModeInstruction(Relative);
-		bcc(displacement);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xB0){
-		uint8_t displacement = getModeInstruction(Relative);
-		bcs(displacement);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xF0){
-		uint8_t displacement = getModeInstruction(Relative);
-		beq(displacement);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x30){
-		uint16_t displacement = getModeInstruction(Relative);
-		bmi(displacement);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xD0){
-		uint16_t displacement = getModeInstruction(Relative);
-		bne(displacement);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x10){
-		uint16_t displacement = getModeInstruction(Relative);
-		bpl(displacement);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x50){
-		uint16_t displacement = getModeInstruction(Relative);
-		bvc(displacement);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x70){
-		uint16_t displacement = getModeInstruction(Relative);
-		bvs(displacement);
-
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x18){
-		clc();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xD8){
-		cld();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x58){
-		cli();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xB8){
-		clv();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x38){
-		sec();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0xF8){
-		sed();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x78){
-		sei();
-		waitCycle += 2;
-	}
-
-	if(opcode == 0x00){
-		brk();
-		waitCycle += 7;
-	}
-
-	if(opcode == 0x40){
-		rti();
-		waitCycle += 6;
-	}
-
-	if(opcode == 0x9E){
-	 	uint16_t address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
-		uint16_t temp = address + y;
-		
-		uint8_t ms = address >> 8;
-		ms++;
-		
-		if((address & 0xFF00) != (temp & 0xFF00)){
-			temp = address & 0x00FF | ((x & ms) << 8);
-			temp += y;
-		}
-
-		stx(temp & ms);
-		
-		waitCycle += 5;
-	}
-
-	if(opcode == 0x9C){
-	 	uint16_t address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
-		uint16_t temp = address + x;
-
-		uint8_t ms = address >> 8;
-		ms++;
-		
-		if((address & 0xFF00) != (temp & 0xFF00)){
-			temp = address & 0x00FF | ((y & ms) << 8);
-			temp += x;
-		}
-
-		stx(temp & ms);
-
-		waitCycle += 5;
-	}
-
-	if(opcode == 0xA7){
-		uint16_t address = getModeInstruction(ZeroPage);
-		uint8_t value = bus->cpuRead(address);
-		lax(value);
-
-		waitCycle += 3;
-	}
-
-
-	if(opcode == 0xB7){
-		uint16_t address = getModeInstruction(ZeroPageY);
-		uint8_t value = bus->cpuRead(address);
-		lax(value);
-
-		waitCycle += 4;
-	}
-
-	if(opcode == 0xAF){
-		uint16_t address = getModeInstruction(Absolute);
-		uint8_t value = bus->cpuRead(address);
-		lax(value);
-
-		waitCycle += 4;
-	}
+		case 0xA6:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			ldx(value);
 	
-	if(opcode == 0xBF){
-		uint16_t address = getModeInstruction(AbsoluteY);
-		uint8_t value = bus->cpuRead(address);
-		lax(value);
+			waitCycle += 3;
+			break;
 
-		waitCycle += 4;
-		
-		if(pageCrossed)
-			waitCycle++;
-	}
-
-	if(opcode == 0x87){
-		uint16_t address = getModeInstruction(ZeroPage);
-		sax(address);
-	}
-
-	if(opcode == 0x97){
-		uint16_t address = getModeInstruction(ZeroPageY);
-		sax(address);
-	}
-
-	if(opcode == 0x8F){
-		uint16_t address = getModeInstruction(Absolute);
-		sax(address);
-	}
-
-	if(opcode == 0x83){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		sax(address);
-	}
 	
-	if(opcode == 0xA3){
-		uint16_t address = getModeInstruction(IndexedIndirect);
-		uint8_t value = bus->cpuRead(address);
-		lax(value);
-
-		waitCycle += 6;
-	}
+		case 0xB6:
+			address = getModeInstruction(ZeroPageY);
+			value = bus->cpuRead(address);
+			ldx(value);
 	
-	if(opcode == 0xB3){
-		uint16_t address = getModeInstruction(IndirectIndexed);
-		uint8_t value = bus->cpuRead(address);
-		lax(value);
+			waitCycle += 4;
+			break;
 
-		waitCycle += 4;
+	
+		case 0xAE:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			ldx(value);
+	
+			waitCycle += 4;
+			break;
+
+	
+		case 0xBE:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			ldx(value);
 		
-		if(pageCrossed)
-			waitCycle++;
-	}
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
 
-	if( opcode == 0xE9 || 
-		opcode == 0xEB
-	){
-		uint8_t value = getModeInstruction(Immediate);
-		adc(value ^ 0xFF);
-		waitCycle += 2;
-	}
+	
+		case 0xA0:
+			value = getModeInstruction(Immediate);
+			ldy(value);
+	
+			waitCycle += 2;
+			break;
 
-	if( opcode == 0x1A || 
-		opcode == 0x3A || 
-		opcode == 0x5A || 
-		opcode == 0x7A || 
-		opcode == 0xDA || 
-		opcode == 0xEA || 
-		opcode == 0xFA
-	){
-		nop();
-		waitCycle += 2;
-	}
+	
+		case 0xA4:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			ldy(value);
+	
+			waitCycle += 3;
+			break;
 
-	if( opcode == 0x80 ||
-		opcode == 0x82 ||
-		opcode == 0x89 ||
-		opcode == 0xC2 ||
-		opcode == 0xE2
-	){
+	
+		case 0xB4:
+			address = getModeInstruction(ZeroPageX);
+			value = bus->cpuRead(address);
+			ldy(value);
+			
+			waitCycle += 4;
+			break;
 
-		getModeInstruction(Immediate);
-		waitCycle += 2;
-	}
+	
+		case 0xAC:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			ldy(value);
+			
+			waitCycle += 4;
+			break;
 
-	if(opcode == 0x0C){
-		getModeInstruction(Absolute);
-		waitCycle += 4;
-	}
-
-	if( opcode == 0x1C ||
-		opcode == 0x3C ||
-		opcode == 0x5C ||
-		opcode == 0x7C ||
-		opcode == 0xDC ||
-		opcode == 0xFC
-	){
-
-		getModeInstruction(AbsoluteX);
+	
+		case 0xBC:
+			address = getModeInstruction(AbsoluteX);
+			value = bus->cpuRead(address);
+			ldy(value);
 		
-		waitCycle += 4;
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
 
-		if(pageCrossed)
-			waitCycle++;
+	
+		case 0x85:
+			address = getModeInstruction(ZeroPage);
+			sta(address);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x95:
+			address = getModeInstruction(ZeroPageX);
+			sta(address);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x8D:
+			address = getModeInstruction(Absolute);
+			sta(address);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x9D:
+			address = getModeInstruction(AbsoluteX);
+			sta(address);
+			waitCycle += 5;
+			break;
+
+	
+		case 0x99:
+			address = getModeInstruction(AbsoluteY);
+			sta(address);
+			waitCycle += 5;
+			break;
+
+	
+		case 0x81:
+			address = getModeInstruction(IndexedIndirect);
+			sta(address);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x91:
+			address = getModeInstruction(IndirectIndexed);
+			sta(address);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x86:
+			address = getModeInstruction(ZeroPage);
+			stx(address);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x96:
+			address = getModeInstruction(ZeroPageY);
+			stx(address);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x8E:
+			address = getModeInstruction(Absolute);
+			stx(address);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x84:
+			address = getModeInstruction(ZeroPage);
+			sty(address);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x94:
+			address = getModeInstruction(ZeroPageX);
+			sty(address);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x8C:
+			address = getModeInstruction(Absolute);
+			sty(address);
+			waitCycle += 4;
+			break;
+
+	
+		case 0xAA:
+			tax();
+			waitCycle += 2;
+			break;
+
+	
+		case 0xA8:
+			tay();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x8A:
+			txa();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x98:
+			tya();
+			waitCycle += 2;
+			break;
+
+	
+		case 0xBA:
+			tsx();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x9A:
+			txs();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x48:
+			pha();
+			waitCycle += 3;
+			break;
+
+	
+		case 0x08:
+			php();
+			waitCycle += 3;
+			break;
+
+	
+		case 0x68:
+			pla();
+			waitCycle += 4;
+			break;
+
+	
+		case 0x28:
+			plp();
+			waitCycle += 4;
+			break;
+
+	
+		case 0x29:
+			value = getModeInstruction(Immediate);
+			andL(value);
+			waitCycle += 2;
+			break;
+
+	
+		case 0x25:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			andL(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x35:
+			address = getModeInstruction(ZeroPageX);
+			value = bus->cpuRead(address);
+			andL(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x2D:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			andL(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x3D:
+			address = getModeInstruction(AbsoluteX);
+			value = bus->cpuRead(address);
+			andL(value);
+	
+			waitCycle += 4;
+	
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x39:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			andL(value);
+		
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x21:
+			address = getModeInstruction(IndexedIndirect);
+			value = bus->cpuRead(address);
+			andL(value);
+	
+			waitCycle += 6;
+			break;
+
+	
+		case 0x31:
+			address = getModeInstruction(IndirectIndexed);
+			value = bus->cpuRead(address);
+			andL(value);
+		
+			waitCycle += 5;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x49:
+			value = getModeInstruction(Immediate);
+			eor(value);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0x45:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			eor(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x55:
+			address = getModeInstruction(ZeroPageX);
+			value = bus->cpuRead(address);
+			eor(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x4D:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			eor(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x5D:
+			address = getModeInstruction(AbsoluteX);
+			value = bus->cpuRead(address);
+			eor(value);
+		
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x59:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			eor(value);
+		
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x41:
+			address = getModeInstruction(IndexedIndirect);
+			value = bus->cpuRead(address);
+			eor(value);
+	
+			waitCycle += 6;
+			break;
+
+	
+		case 0x51:
+			address = getModeInstruction(IndirectIndexed);
+			value = bus->cpuRead(address);
+			eor(value);
+		
+			waitCycle += 5;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x09:
+			value = getModeInstruction(Immediate);
+			ora(value);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0x05:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			ora(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x15:
+			address = getModeInstruction(ZeroPageX);
+			value = bus->cpuRead(address);
+			ora(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x0D:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			ora(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x1D:
+			address = getModeInstruction(AbsoluteX);
+			value = bus->cpuRead(address);
+			ora(value);
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x19:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			ora(value);
+			
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x01:
+			address = getModeInstruction(IndexedIndirect);
+			value = bus->cpuRead(address);
+			ora(value);
+	
+			waitCycle += 6;
+			break;
+
+	
+		case 0x11:
+			address = getModeInstruction(IndirectIndexed);
+			value = bus->cpuRead(address);
+			ora(value);
+			
+			waitCycle += 5;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x24:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			bit(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x2C:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			bit(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x69:
+			value = getModeInstruction(Immediate);
+			adc(value);
+			waitCycle += 2;
+			break;
+
+	
+		case 0x65:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			adc(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x75:
+			address = getModeInstruction(ZeroPageX);
+			value = bus->cpuRead(address);
+			adc(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x6D:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			adc(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x7D:
+			address = getModeInstruction(AbsoluteX);
+			value = bus->cpuRead(address);
+			adc(value);
+			
+			waitCycle += 4;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x79:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			adc(value);
+	
+			waitCycle += 4;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x61:
+			address = getModeInstruction(IndexedIndirect);
+			value = bus->cpuRead(address);
+			adc(value);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x71:
+			address = getModeInstruction(IndirectIndexed);
+			value = bus->cpuRead(address);
+			adc(value);
+	
+			waitCycle += 5;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0xE5:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			sbc(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0xF5:
+			address = getModeInstruction(ZeroPageX);
+			value = bus->cpuRead(address);
+			sbc(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0xED:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			sbc(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0xFD:
+			address = getModeInstruction(AbsoluteX);
+			value = bus->cpuRead(address);
+			sbc(value);
+			
+			waitCycle += 4;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0xF9:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			sbc(value);
+		
+			waitCycle += 4;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0xE1:
+			address = getModeInstruction(IndexedIndirect);
+			value = bus->cpuRead(address);
+			sbc(value);
+			
+			waitCycle += 6;
+			break;
+
+	
+		case 0xF1:
+			address = getModeInstruction(IndirectIndexed);
+			value = bus->cpuRead(address);
+			sbc(value);
+	
+			waitCycle += 5;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0xC9:
+			value = getModeInstruction(Immediate);
+			cmp(value);
+			waitCycle += 2;
+			break;
+
+	
+		case 0xC5:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			cmp(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0xD5:
+			address = getModeInstruction(ZeroPageX);
+			value = bus->cpuRead(address);
+			cmp(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0xCD:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			cmp(value);
+			waitCycle += 4;
+			break;
+
+		
+		case 0xDD:
+			address = getModeInstruction(AbsoluteX);
+			value = bus->cpuRead(address);
+			cmp(value);
+	
+			waitCycle += 4;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+		
+		case 0xD9:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			cmp(value);
+	
+			waitCycle += 4;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+		
+		case 0xC1:
+			address = getModeInstruction(IndexedIndirect);
+			value = bus->cpuRead(address);
+			cmp(value);
+			waitCycle += 6;
+			break;
+
+		
+		case 0xD1:
+			address = getModeInstruction(IndirectIndexed);
+			value = bus->cpuRead(address);
+			cmp(value);
+			
+			waitCycle += 5;
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0xE0:
+			value = getModeInstruction(Immediate);
+			cpx(value);
+			waitCycle += 2;
+			break;
+
+	
+		case 0xE4:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			cpx(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0xEC:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			cpx(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0xC0:
+			value = getModeInstruction(Immediate);
+			cpy(value);
+			waitCycle += 2;
+			break;
+
+	
+		case 0xC4:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			cpy(value);
+			waitCycle += 3;
+			break;
+
+	
+		case 0xCC:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			cpy(value);
+			waitCycle += 4;
+			break;
+
+	
+		case 0xE6:
+			address = getModeInstruction(ZeroPage);
+			inc(address);
+			waitCycle += 5;
+			break;
+
+	
+		case 0xF6:
+			address = getModeInstruction(ZeroPageX);
+			inc(address);
+			waitCycle += 6;
+			break;
+
+	
+		case 0xEE:
+			address = getModeInstruction(Absolute);
+			inc(address);
+			waitCycle += 6;
+			break;
+
+	
+		case 0xFE:
+			address = getModeInstruction(AbsoluteX);
+			inc(address);
+			waitCycle += 7;
+			break;
+
+	
+		case 0xE8:
+			inx();
+			waitCycle += 2;
+			break;
+
+	
+		case 0xC8:
+			iny();
+			waitCycle += 2;
+			break;
+
+	
+		case 0xC6:
+			address = getModeInstruction(ZeroPage);
+			dec(address);
+			waitCycle += 5;
+			break;
+
+	
+		case 0xD6:
+			address = getModeInstruction(ZeroPageX);
+			dec(address);
+			waitCycle += 6;
+			break;
+
+	
+		case 0xCE:
+			address = getModeInstruction(Absolute);
+			dec(address);
+			waitCycle += 6;
+			break;
+
+	
+		case 0xDE:
+			address = getModeInstruction(AbsoluteX);
+			dec(address);
+			waitCycle += 7;
+			break;
+
+	
+		case 0xCA:
+			dex();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x88:
+			dey();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x0A:
+			asl(a, true);
+			waitCycle += 2;
+			break;
+
+	
+		case 0x06:
+			address = getModeInstruction(ZeroPage);
+			asl(address, false);
+			waitCycle += 5;
+			break;
+
+	
+		case 0x16:
+			address = getModeInstruction(ZeroPageX);
+			asl(address, false);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x0E:
+			address = getModeInstruction(Absolute);
+			asl(address, false);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x1E:
+			address = getModeInstruction(AbsoluteX);
+			asl(address, false);
+			waitCycle += 7;
+			break;
+
+	
+		case 0x4A:
+			lsr(a, true);
+			waitCycle += 2;
+			break;
+
+	
+		case 0x46:
+			address = getModeInstruction(ZeroPage);
+			lsr(address, false);
+			waitCycle += 5;
+			break;
+
+	
+		case 0x56:
+			address = getModeInstruction(ZeroPageX);
+			lsr(address, false);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x4E:
+			address = getModeInstruction(Absolute);
+			lsr(address, false);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x5E:
+			address = getModeInstruction(AbsoluteX);
+			lsr(address, false);
+			waitCycle += 7;
+			break;
+
+	
+		case 0x2A:
+			rol(a, true);
+			waitCycle += 2;
+			break;
+
+	
+		case 0x26:
+			address = getModeInstruction(ZeroPage);
+			rol(address, false);
+			waitCycle += 5;
+			break;
+
+	
+		case 0x36:
+			address = getModeInstruction(ZeroPageX);
+			rol(address, false);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x2E:
+			address = getModeInstruction(Absolute);
+			rol(address, false);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x3E:
+			address = getModeInstruction(AbsoluteX);
+			rol(address, false);
+			waitCycle += 7;
+			break;
+
+	
+		case 0x6A:
+			ror(a, true);
+			waitCycle += 2;
+			break;
+
+	
+		case 0x66:
+			address = getModeInstruction(ZeroPage);
+			ror(address, false);
+			waitCycle += 5;
+			break;
+
+	
+		case 0x76:
+			address = getModeInstruction(ZeroPageX);
+			ror(address, false);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x6E:
+			address = getModeInstruction(Absolute);
+			ror(address, false);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x7E:
+			address = getModeInstruction(AbsoluteX);
+			ror(address, false);
+			waitCycle += 7;
+			break;
+
+	
+		case 0x4C:
+			address = getModeInstruction(Absolute);
+			jmp(address);
+			waitCycle += 3;
+			break;
+
+	
+		case 0x6C:
+			address = getModeInstruction(Indirect);
+			jmp(address);
+			waitCycle += 5;
+			break;
+
+	
+		case 0x20:
+			address = getModeInstruction(Absolute);
+			jsr(address);
+			waitCycle += 6;
+			break;
+
+	
+		case 0x60:
+			rts();
+			waitCycle += 6;
+			break;
+
+	
+		case 0x90:
+			displacement = getModeInstruction(Relative);
+			bcc(displacement);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0xB0:
+			displacement = getModeInstruction(Relative);
+			bcs(displacement);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0xF0:
+			displacement = getModeInstruction(Relative);
+			beq(displacement);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0x30:
+			displacement = getModeInstruction(Relative);
+			bmi(displacement);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0xD0:
+			displacement = getModeInstruction(Relative);
+			bne(displacement);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0x10:
+			displacement = getModeInstruction(Relative);
+			bpl(displacement);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0x50:
+			displacement = getModeInstruction(Relative);
+			bvc(displacement);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0x70:
+			displacement = getModeInstruction(Relative);
+			bvs(displacement);
+	
+			waitCycle += 2;
+			break;
+
+	
+		case 0x18:
+			clc();
+			waitCycle += 2;
+			break;
+
+	
+		case 0xD8:
+			cld();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x58:
+			cli();
+			waitCycle += 2;
+			break;
+
+	
+		case 0xB8:
+			clv();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x38:
+			sec();
+			waitCycle += 2;
+			break;
+
+	
+		case 0xF8:
+			sed();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x78:
+			sei();
+			waitCycle += 2;
+			break;
+
+	
+		case 0x00:
+			brk();
+			waitCycle += 7;
+			break;
+
+	
+		case 0x40:
+			rti();
+			waitCycle += 6;
+			break;
+
+	
+		case 0x9E:
+		 	address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
+			temp = address + y;
+			{
+				uint8_t ms = address >> 8;
+				ms++;
+				
+				if((address & 0xFF00) != (temp & 0xFF00)){
+					temp = address & 0x00FF | ((x & ms) << 8);
+					temp += y;
+				}
+	
+				stx(temp & ms);
+			}
+			waitCycle += 5;
+			break;
+
+	
+		case 0x9C:
+		 	address = (uint8_t)bus->cpuRead(pc) | (bus->cpuRead(++pc) << 8);
+			temp = address + x;
+
+			{
+				uint8_t ms = address >> 8;
+				ms++;
+			
+				if((address & 0xFF00) != (temp & 0xFF00)){
+					temp = address & 0x00FF | ((y & ms) << 8);
+					temp += x;
+				}
+	
+				stx(temp & ms);
+			}
+			waitCycle += 5;
+			break;
+
+	
+		case 0xA7:
+			address = getModeInstruction(ZeroPage);
+			value = bus->cpuRead(address);
+			lax(value);
+	
+			waitCycle += 3;
+			break;
+
+	
+	
+		case 0xB7:
+			address = getModeInstruction(ZeroPageY);
+			value = bus->cpuRead(address);
+			lax(value);
+	
+			waitCycle += 4;
+			break;
+
+	
+		case 0xAF:
+			address = getModeInstruction(Absolute);
+			value = bus->cpuRead(address);
+			lax(value);
+	
+			waitCycle += 4;
+			break;
+
+		
+		case 0xBF:
+			address = getModeInstruction(AbsoluteY);
+			value = bus->cpuRead(address);
+			lax(value);
+	
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0x87:
+			address = getModeInstruction(ZeroPage);
+			sax(address);
+			break;
+
+	
+		case 0x97:
+			address = getModeInstruction(ZeroPageY);
+			sax(address);
+			break;
+
+	
+		case 0x8F:
+			address = getModeInstruction(Absolute);
+			sax(address);
+			break;
+
+	
+		case 0x83:
+			address = getModeInstruction(IndexedIndirect);
+			sax(address);
+			break;
+
+		
+		case 0xA3:
+			address = getModeInstruction(IndexedIndirect);
+			value = bus->cpuRead(address);
+			lax(value);
+	
+			waitCycle += 6;
+			break;
+
+		
+		case 0xB3:
+			address = getModeInstruction(IndirectIndexed);
+			value = bus->cpuRead(address);
+			lax(value);
+	
+			waitCycle += 4;
+			
+			if(pageCrossed)
+				waitCycle++;
+			break;
+
+	
+		case 0xE9: case 0xEB:
+			value = getModeInstruction(Immediate);
+			adc(value ^ 0xFF);
+			waitCycle += 2;
+			break;
+	
+		case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA:
+			nop();
+			waitCycle += 2;
+			break;
+	
+		case 0x80: case 0x82: case 0x89: case 0xC2: case 0xE2:
+			getModeInstruction(Immediate);
+			waitCycle += 2;
+			break;
+	
+		case 0x0C:
+			getModeInstruction(Absolute);
+			waitCycle += 4;
+			break;
+
+	
+		case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC:
+			getModeInstruction(AbsoluteX);
+			
+			waitCycle += 4;
+	
+			if(pageCrossed)
+				waitCycle++;
+			break;
+	
+		case 0x04: case 0x44: case 0x64:	
+			getModeInstruction(ZeroPage);
+			waitCycle += 3;
+			break;
+	
+		case 0x14: case 0x34: case 0x54: case 0x74: case 0xD4: case 0xF4:
+			getModeInstruction(ZeroPageX);
+			waitCycle += 4;
+			break;
 	}
-
-	if( opcode == 0x04 || 
-		opcode == 0x44 || 
-		opcode == 0x64
-	){	
-		getModeInstruction(ZeroPage);
-		waitCycle += 3;
-	}
-
-	if( opcode == 0x14 || 
-		opcode == 0x34 || 
-		opcode == 0x54 || 
-		opcode == 0x74 || 
-		opcode == 0xD4 || 
-		opcode == 0xF4
-	){
-		getModeInstruction(ZeroPageX);
-		waitCycle += 4;
-	}
-
 
 
 	pc++;
