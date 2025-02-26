@@ -145,7 +145,7 @@ DWORD WINAPI ep(void* data){
 	wind = CreateWindowEx(
 		0,
 		CLASSNAME,
-		L"Learn to Program Windows",
+		L"Nes",
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, 
 
 		// Size and position
