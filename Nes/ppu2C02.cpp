@@ -190,7 +190,7 @@ uint8_t PPU2C02::cpuRead(uint16_t address){
 	ppuGenLatch = 0;
 	if(address == 0x2){
 		ppuGenLatch = (ppustatus.reg & 0xE0) | (ppuDataBuffer & 0x1F);
-		ppustatus.V = 0;
+		ppustatus.vBlank = 0;
 		w = 0;
 	}
 
@@ -205,7 +205,7 @@ uint8_t PPU2C02::cpuRead(uint16_t address){
 		if(v.reg >= 0x3F00) 
 			ppuGenLatch = ppuDataBuffer;
 		
-		v.reg += (ppuctrl.i ? 32 : 1);
+		v.reg += (ppuctrl.incrementMode ? 32 : 1);
 	}
 
 	return ppuGenLatch;
@@ -256,7 +256,7 @@ void PPU2C02::cpuWrite(uint16_t address, uint8_t value){
 
 	if(address == 0x7){
 		ppuWrite(v.reg, value);
-		v.reg += (ppuctrl.i ? 32 : 1);
+		v.reg += (ppuctrl.incrementMode ? 32 : 1);
 	}
 }
 
@@ -266,7 +266,7 @@ uint32_t PPU2C02::getColor(uint8_t palette, uint8_t pixel){
 
 void PPU2C02::clock(){
 	auto incrementScrollX = [&](){
-		if(ppumask.bg || ppumask.s){
+		if(ppumask.bgRender || ppumask.spriteRender){
 			if(v.coarseX == 31){
 				v.coarseX = 0;
 				v.nametableX = ~v.nametableX;
@@ -277,7 +277,7 @@ void PPU2C02::clock(){
 	};
 	
 	auto incrementScrollY = [&](){
-		if(ppumask.bg || ppumask.s){
+		if(ppumask.bgRender || ppumask.spriteRender){
 			if(v.fineY < 7){
 				v.fineY++;
 			} else {
@@ -296,14 +296,14 @@ void PPU2C02::clock(){
 	};
 	
 	auto transferAddressX = [&](){
-		if(ppumask.bg || ppumask.s){
+		if(ppumask.bgRender || ppumask.spriteRender){
 			v.nametableX = t.nametableX;
 			v.coarseX = t.coarseX;
 		}
 	};
 	
 	auto transferAddressY = [&](){
-		if(ppumask.bg || ppumask.s){
+		if(ppumask.bgRender || ppumask.spriteRender){
 			v.fineY = t.fineY;
 			v.nametableY = t.nametableY;
 			v.coarseY = t.coarseY;
@@ -319,7 +319,7 @@ void PPU2C02::clock(){
 	};
 	
 	auto updateShifters = [&](){
-		if(ppumask.bg){
+		if(ppumask.bgRender){
 			bgShifterPatternLs <<= 1;
 			bgShifterPatternMs <<= 1;
 
@@ -327,7 +327,7 @@ void PPU2C02::clock(){
 			bgShifterAttributeMs <<= 1;
 		}
 
-		if(ppumask.s && 1 <= cycle && cycle < 258){
+		if(ppumask.spriteRender && 1 <= cycle && cycle < 258){
 			for(int i = 0; i < spriteCount; ++i){
 				if(spriteScanline[i].x > 0){
 					spriteScanline[i].x--;
@@ -341,9 +341,9 @@ void PPU2C02::clock(){
 
 	if(-1 <= scanline && scanline <= 239){
 		if(scanline == -1 && cycle == 1){
-			ppustatus.V = 0;
-			ppustatus.S = 0;
-			ppustatus.O = 0;
+			ppustatus.vBlank = 0;
+			ppustatus.spriteZeroHit = 0;
+			ppustatus.spriteOverflow = 0;
 
 			for(int i = 0; i < 8; ++i){
 				spriteShifterPatternLs[i] = 0;
@@ -374,13 +374,13 @@ void PPU2C02::clock(){
 			}
 			
 			if((cycle - 1) % 8 == 4){
-				bgNextTileLs = ppuRead((ppuctrl.b << 12) 
+				bgNextTileLs = ppuRead((ppuctrl.bgTile << 12) 
 										+ ((uint16_t)bgNextTileId << 4)
 										+ v.fineY);
 			}
 			
 			if((cycle - 1) % 8 == 6){
-				bgNextTileMs = ppuRead((ppuctrl.b << 12)
+				bgNextTileMs = ppuRead((ppuctrl.bgTile << 12)
 										+ ((uint16_t)bgNextTileId << 4) 
 										+ (v.fineY) + 8);
 			}
@@ -423,7 +423,7 @@ void PPU2C02::clock(){
 			while(nOAMEntry < 64 && spriteCount < 9){
 				int16_t diff = ((int16_t)scanline - (int16_t)oam[nOAMEntry].y);
 
-				if(0 <= diff && diff < (ppuctrl.h ? 16 : 8)){
+				if(0 <= diff && diff < (ppuctrl.spriteHeight ? 16 : 8)){
 					if(spriteCount < 8){
 						if(nOAMEntry == 0){
 							bSpriteZeroHitPossible = true;
@@ -437,7 +437,7 @@ void PPU2C02::clock(){
 				nOAMEntry++;
 			}
 
-			ppustatus.O = (spriteCount > 8);
+			ppustatus.spriteOverflow = (spriteCount > 8);
 		}
 		
 		if(cycle == 340){
@@ -445,13 +445,13 @@ void PPU2C02::clock(){
 				uint8_t spritePatternBitsLs, spritePatternBitsMs;
 				uint16_t spritePatternAddrLs, spritePatternAddrMs;
 
-				if(!ppuctrl.h){
+				if(!ppuctrl.spriteHeight){
 					if(!(spriteScanline[i].attribute & 0x80)){
-						spritePatternAddrLs = (ppuctrl.s << 12) 
+						spritePatternAddrLs = (ppuctrl.spriteTile << 12) 
 							| (spriteScanline[i].index << 4) 
 							| (scanline - spriteScanline[i].y);
 					} else {
-						spritePatternAddrLs = (ppuctrl.s << 12)
+						spritePatternAddrLs = (ppuctrl.spriteTile << 12)
 							| (spriteScanline[i].index << 4)
 							| (7 - (scanline - spriteScanline[i].y));
 					}
@@ -504,9 +504,9 @@ void PPU2C02::clock(){
 
 	if(241 <= scanline && scanline <= 260){
 		if(scanline == 241 && cycle == 1){
-			ppustatus.V = 1;
+			ppustatus.vBlank = 1;
 
-			if(ppuctrl.v)
+			if(ppuctrl.nmiEnable)
 				nmi = true;
 		}
 	}
@@ -514,7 +514,7 @@ void PPU2C02::clock(){
 	uint8_t bgPixel = 0;
 	uint8_t bgPalette = 0;
 
-	if(ppumask.bg){
+	if(ppumask.bgRender){
 		uint16_t bit_mux = 0x8000 >> x;
 
 		uint8_t pixelLs = (bgShifterPatternLs & bit_mux) != 0;
@@ -530,7 +530,7 @@ void PPU2C02::clock(){
 	uint8_t fgPalette = 0;
 	uint8_t fgPriority = 0;
 
-	if(ppumask.s){
+	if(ppumask.spriteRender){
 		bSpriteZeroBeingRendered = false;
 		for(int i = 0; i < spriteCount; ++i){
 			if(spriteScanline[i].x == 0){
@@ -573,14 +573,14 @@ void PPU2C02::clock(){
 		}
 
 		if(bSpriteZeroHitPossible && bSpriteZeroBeingRendered){
-			if(ppumask.bg & ppumask.s){
-				if(!(ppumask.bgL | ppumask.sL)){
+			if(ppumask.bgRender & ppumask.spriteRender){
+				if(!(ppumask.bgLeftmost | ppumask.spriteLeftmost)){
 					if(9 <= cycle && cycle < 258){
-						ppustatus.S = 1;
+						ppustatus.spriteZeroHit = 1;
 					}
 				} else {
 					if(1 <= cycle && cycle < 258){
-						ppustatus.S = 1;
+						ppustatus.spriteZeroHit = 1;
 					}
 				}
 			}

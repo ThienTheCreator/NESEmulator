@@ -36,13 +36,13 @@ class PPU2C02{
 	
 	uint8_t bgNextTileId = 0;
 	uint8_t bgNextTileAttribute = 0;
-	uint8_t bgNextTileLs = 0;
-	uint8_t bgNextTileMs = 0;
+	uint8_t bgNextTileLs = 0; 			// Least Significant
+	uint8_t bgNextTileMs = 0; 			// Most Significant
 
-	uint16_t bgShifterPatternLs = 0;
-	uint16_t bgShifterPatternMs = 0;
-	uint16_t bgShifterAttributeLs = 0;
-	uint16_t bgShifterAttributeMs = 0;
+	uint16_t bgShifterPatternLs = 0; 	// Pattern Least Significant
+	uint16_t bgShifterPatternMs = 0; 	// Pattern Most Significant
+	uint16_t bgShifterAttributeLs = 0; 	// Attribute Shifter Least Significant
+	uint16_t bgShifterAttributeMs = 0;  // Attribute Shifter Least Significatn
 
 	uint8_t spriteShifterPatternLs[8];
 	uint8_t spriteShifterPatternMs[8];
@@ -60,38 +60,38 @@ public:
 	
 	union PPUCTRL{
 		struct {
-			uint8_t nametableX: 1; // nametable x
-			uint8_t nametableY: 1; // nametable y 
-			uint8_t  i: 1; // increment mode
-			uint8_t  s: 1; // sprite tile select: unimplemented for 8x8 sprite	
-			uint8_t  b: 1; // background tile select
-			uint8_t  h: 1; // sprite height
-			uint8_t  p: 1; // PPU master/slave
-			uint8_t  v: 1; // nmi enable
+			uint8_t nametableX: 1; 		// (0 = $2000; 1 = $2400;
+			uint8_t nametableY: 1; 		//  2 = $2800; 3 = $2C00)
+			uint8_t incrementMode: 1; 	// (0: add 1, going across; 1: add 32, going down)
+			uint8_t spriteTile: 1; 		// (0: $0000; 1: $1000; ignored in 8x16 mode)
+			uint8_t bgTile: 1; 			// (0: $0000; 1: $1000)
+			uint8_t spriteHeight: 1; 	// (0: 8x8 pixels; 1: 8x16 pixels – see PPU OAM#Byte 1)
+			uint8_t ppuSelect: 1; 		// (0: read backdrop from EXT pins; 1: output color on EXT pins)
+			uint8_t nmiEnable: 1; 		// (0: off, 1: on)
 		};
 		uint8_t reg;
 	} ppuctrl;
 
 	union PPUMASK{
 		struct{
-			uint8_t greyscale:1;    // Greyscale
-			uint8_t bgL:1; 			// Bg leftmost
-			uint8_t sL:1; 			// sprite leftmost
-			uint8_t bg:1; 			// Bg rendering
-			uint8_t s:1;			// sprite rendering
-			uint8_t R:1; 			// emphasize red
-			uint8_t G:1; 			// emphasize green
-			uint8_t	B:1; 			// emphasize blue
+			uint8_t greyscale:1;    	// (0: normal color, 1: greyscale)
+			uint8_t bgLeftmost:1; 		// Bg leftmost 8 pixels of screen
+			uint8_t spriteLeftmost:1; 	// sprite leftmost 8 pixels of screen
+			uint8_t bgRender:1; 		// enable Bg rendering
+			uint8_t spriteRender:1;		// enable sprite rendering
+			uint8_t red:1; 				// emphasize red (green on PAL/Dendy)
+			uint8_t green:1; 			// emphasize green (red on PAL/Dendy)
+			uint8_t	blue:1; 			// emphasize blue
 		};
 		uint8_t reg;
 	} ppumask;
 
 	union PPUSTATUS{
 		struct{
-			uint8_t openBus:5;			
-			uint8_t O:1; // sprite overflow
-			uint8_t S:1; // sprite 0 hit
-			uint8_t V:1; // vblank
+			uint8_t openBus:5;
+			uint8_t spriteOverflow:1;
+			uint8_t spriteZeroHit:1;
+			uint8_t vBlank:1; 			// cleared on read. Unreliable;
 		};
 		uint8_t reg;
 	} ppustatus;
